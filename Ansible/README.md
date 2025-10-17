@@ -194,13 +194,6 @@ The repository includes validation mechanisms:
 - Configuration file validation
 - Database connectivity testing
 
-## Contributing
-
-When adding new features:
-1. Use appropriate tags for selective execution
-2. Include both RedHat and Debian support where applicable
-3. Add variables to `vars/main.yml` for customization
-4. Document new tags and functionality
 
 ## Troubleshooting
 
@@ -215,7 +208,3 @@ Run with verbose output for troubleshooting:
 ```bash
 ansible-playbook -i inventory/anisblehosts myproject.yml -vvv
 ```
-
-## License
-
-This project is for educational purposes. Feel free to use and modify for learning Ansible automation.
