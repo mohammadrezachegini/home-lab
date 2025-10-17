@@ -1,0 +1,25 @@
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+    "username": "salam",
+    "email": "salam@salam.com",
+    "mobile": "3269658745",
+    "password": "salamsalam",
+    "confirm_password": "salamsalam"
+
+
+}
+
+
+#### login
+
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+    "username": "salam",
+    "password": "salamsalam"
+
+
+}

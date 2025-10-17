@@ -1,0 +1,71 @@
+pipeline {
+    agent {
+        label 'worker'
+    }
+    options {
+        buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '7', numToKeepStr: '2')
+    }
+
+    environment {
+        dockercred = credentials('docker-hub')
+        awscred = crdentials()'aws-key'
+    }
+    stages {
+        stage('CheckOut ') {
+            steps {
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/mohammadrezachegini/Node-JS-Jenkins']])
+            }
+        }
+
+
+        stage('php composer test ') {
+            steps {
+                sh 'composer install'
+                sh 'ls'
+            }
+        }
+
+        stage('Docker build'){
+            steps{
+                sh 'docker -v'
+                sh 'docker build -t lowyiiii/php-project:latest .'
+                sh 'echo $dockercred_PSW | docker login -u $dockercred_USR --password-stdin'
+                sh 'docker push lowyiiii/php-project:latest'
+            }
+        }
+
+        stage('aws test ') {
+            steps {
+                sh 'aws --version'
+                sh 'aws sts get-caller-identity'
+            }
+        }
+
+        stage('kube config setup ') {
+            steps {
+                sh 'aws eks update-kubeconfig --region us-east-1 --name devops-working'
+            }
+        }
+
+        stage('kubectl deployment - dev'){
+            steps{
+                sh 'kubectl apply -f deploymen-dev.yaml -n dev'
+            }
+        }
+
+        stage('kubectl deployment - staging'){
+            steps{
+                sh 'kubectl apply -f deploymen-staging.yaml -n staging'
+            }
+        }
+
+        stage('kubectl deployment - prod'){
+            steps{
+                scripts{
+                    def = approval = input id: 'Deployment', message: 'Do you want to deploy to production?', submitter: 'admin'
+                }
+                sh 'kubectl apply -f deploymen-prod.yaml -n prod'
+            }
+        }
+    }
+}

@@ -1,0 +1,767 @@
+
+- name: ---- create directory in /home/reza ----
+  file:
+    path: /home/reza/testdir1
+    state: directory
+    owner: reza
+    group: reza
+    mode: 0755
+  tags: [create_dir]
+
+- name: ---- create file in /home/reza/testdir
+  file:
+    path: /home/reza/testdir1/file1
+    state: touch
+    owner: reza
+    group: reza
+    mode: 0755
+  tags: [create_file]
+
+
+- name: ---- show my user list ----
+  debug:
+    msg: "{{user_list[0]}}"
+  tags: [show_user_list]
+
+
+- name: ---- show my user list 2----
+  debug:
+    msg: "{{user_list2}}"
+  tags: [show_user_list2]
+
+
+- name: --- create var and test in tasks main yaml ----
+  set_fact:
+    myvar: "salam"
+- name: ----show my var ----
+  debug:
+    msg: "{{myvar}}"
+  tags: [show_my_var]
+
+- name: ----show my os family ----
+  debug:
+    msg: "{{ansible_os_family}}"
+  tags: [show_my_os_family]
+
+- name: ----show my http port as group vars----
+  debug:
+    msg: "{{http_port}}"
+  tags: [show_my_http_port]
+
+- name: ---- command module ----
+  command: cat file1
+  args:
+    chdir: /home/reza/testdir1
+  register: catty
+  tags: [show_command_module]
+
+- name: ---- show result of command module ---
+  debug:
+    msg: "{{catty.stdout}}"
+  tags: [show_command_module]
+
+
+- name: ---- command module Execise for df -h ----
+  command: df -h
+  register: df
+  tags: [show_command_module_ex8_df]
+
+- name: ---- show result of command module for df -h Exercise---
+  debug:
+    msg: "{{df.stdout}}"
+  tags: [show_command_module_ex8_df]
+
+- name: ---- show my user name ----
+  debug:
+    msg: "{{user.name}}"
+  tags: [show_var_username]
+
+- name: ---- show my user email ----
+  debug:
+    msg: "{{user.email}}"
+  tags: [show_var_email]
+
+
+
+
+
+
+- name: --- copy module ---
+  copy:
+    src: file1
+    dest: /home/reza/testdir1
+    owner: reza
+    group: reza
+    mode: 0644
+    backup: yes
+    force: yes
+  tags: [copy_module]
+
+
+
+- name: --- copy module in remote machines ---
+  copy:
+    src: /home/reza/testdir1/file1
+    dest: /home/reza
+    owner: reza
+    group: reza
+    mode: 0644
+    backup: yes
+    remote_src: yes
+    # force: yes
+  tags: [copy_module_remote]
+
+
+
+- name: --- fetch module ---
+  fetch:
+    src: /home/reza/testdir1/file1
+    dest: /home/reza
+  tags: [fetch_module]
+
+
+- name: --- fetch module flat ---
+  fetch:
+    src: /home/reza/testdir1/file1
+    dest: /home/reza/
+    flat: yes
+  tags: [fetch_module_flat]
+
+- name: --- fetch module checksum ---
+  fetch:
+    src: /home/reza/testdir1/file1
+    dest: /home/reza/
+    flat: yes
+    validate_checksum: no
+  tags: [fetch_module_checksum]
+
+
+
+- name: --- group module ---
+  group:
+    name: mamad
+    state: present
+  tags: [group_module]
+
+- name: --- group module ---
+  group:
+    name: devops
+    state: present
+  tags: [group_module]
+
+- name: --- user module ---
+  user:
+    name: user1
+    group: devops
+    state: present #absent for delete
+    shell: /bin/bash
+    home: /tmp/reza
+    password: 123
+  tags: [user_module]
+
+
+- name: --- lineinfile module -- 
+  lineinfile:
+    path: ~/.bashrc # if it doesn't exist it will append at the end of the file
+    insertafter: 'alias sss=echo {{myvarinbash}} '
+    line: 'alias ssss=echo {{myvarinbash}}'
+  tags: [lineinfile_module]
+
+
+- name: --- replace module -- 
+  replace:
+    path: ~/.bashrc # if it doesn't exist it will append at the end of the file
+    regexp: 'alias ssss=echo {{myvarinbash}} '
+    replace: 'alias ffff=echo {{myvarinbash}}'
+    # after: 'start after line'
+    # before: 'start before line'
+    # backup: yes
+  tags: [replace_module]
+
+
+- name: Ensure /etc/yum.repos.d exists
+  file:
+    path: /etc/yum.repos.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [ensure_yum_repo_dir]
+
+
+- name: --- yum repos module ---
+  yum_repository:
+    name: epel
+    description: Extra Packages for Enterprise Linux
+    baseurl: http://download.fedoraproject.org/pub/epel/9/Everything/x86_64/
+    gpgcheck: no
+    enabled: yes
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [yum_repo_module]
+
+- name: --- yum module ---
+  yum:
+    name: nginx
+    state: latest
+    exclude: kernel*
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [yum_module]
+
+- name: --- yum list ---
+  yum:
+    list: ansible
+  register: yum_out
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [yum_list_module]
+
+- name: --- yum list print out ---
+  debug:
+    msg: "Installed package details: {{ yum_out.results }}"
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [yum_list_module]
+
+- name: --- apt module ---
+  apt:
+    name: nginx # '*' updates all packages if combined with `state: latest`
+    state: latest # 'present' installs; 'latest' installs or updates
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [apt_module]
+
+# - name: --- apt dpkg module ---
+#   apt:
+#     deb: /opt/deb.pkg
+#   when: ansible_facts['os_family'] == 'Debian'
+#   tags: [apt_module_dpkg]
+
+
+
+
+- name: ---- Copy NGINX config for Ubuntu ----
+  template:
+    src: templates/ubuntu-nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    backup: yes
+  when: ansible_facts['os_family'] == "Debian"
+  tags: [template_module]
+
+- name: ---- Copy NGINX config for Rocky or CentOS ----
+  template:
+    src: templates/rocky-nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    backup: yes
+  when: ansible_facts['os_family'] == "RedHat"
+  tags: [template_module]
+
+
+- name: ---- Change NGINX config for Ubuntu ----
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    insertafter: '        listen       8081;'
+    line: '        listen       8082;'
+  when: ansible_facts['os_family'] == "Debian"
+  tags: [lineinfile_module]
+
+- name: ---- Chnage NGINX config for Rocky or CentOS ----
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    insertafter: '        listen       8081;'
+    line: '        listen       8082;'
+  when: ansible_facts['os_family'] == "RedHat"
+  tags: [lineinfile_module]
+
+
+- name: ---- Change NGINX config for Ubuntu ----
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    insertbefore: '        listen       8081;'
+    line: '        listen       8080;'
+  when: ansible_facts['os_family'] == "Debian"
+  tags: [lineinfile_module]
+
+- name: ---- Chnage NGINX config for Rocky or CentOS ----
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    insertbefore: '        listen       8081;'
+    line: '        listen       8080;'
+  when: ansible_facts['os_family'] == "RedHat"
+  tags: [lineinfile_module]
+
+
+
+- name: ---- Replace module with regex ----
+  replace:
+    path: /etc/nginx/nginxconf
+    regexp: '        listen       8081;'
+    replace: '        listen       80;'
+    # after: 'start after line. *'
+    # before: 'start before line.*'
+    # backup: yes
+  tags: [replace_module]
+
+
+# - name: --- Service Module enabled  ----
+#   service:
+#     name: nginx
+#     enabled: yes
+#   tags: [service_module]
+
+- name: --- Service Module started  ----
+  service:
+    name: nginx
+    state: started
+  tags: [service_module]
+
+# - name: --- Service Module restarted  ----
+#   service:
+#     name: nginx
+#     state: restarted
+#   tags: [service_module]
+
+# - name: --- Service Module started  ----
+#   service:
+#     name: nginx
+#     state: stopped
+#   tags: [service_module]
+
+
+- name: --- Archieve Module   ----
+  archive:
+    path: /home/reza/testdir1/*
+    dest: /home/reza/test.tar.gz
+    exclude_path:
+      - /home/reza/testdir1/file2
+      - /home/reza/testdir1/file1.*
+  tags: [archive_module]
+
+
+
+- name: --- Unarchieve Module   ----
+  unarchive:
+    src: /home/reza/test.tar.gz
+    dest: /home/reza/testdir2
+    # exclude_path:
+      # - f3
+    keep_newer: no
+    remote_src: yes
+    # creates: no
+  tags: [unarchive_module]
+
+
+- name: ---- wait module ---
+  wait_for: 
+    timeout: 10
+  delegate_to: localhost
+  tags: [wait_module]
+
+- name: ---- check service status ion log with wait ----
+  wait_for:
+    path: /var/log/nginx/access.log
+    search_regex: "start worker processes"
+  tags: [wait_regex_module]
+
+- name: ---- wait for port ----
+  wait_for:
+    # host: 192.168.68.3 # optional
+    port: 80
+    delay: 10
+    state: started
+  tags: [wait_for_80]
+
+
+# - name: ---- ignore error ----
+#   command: /bin/false
+#   ignore_error: yes
+#   tags: [ignore_error_module]
+
+# - name: ---- after error ----
+#   debug:
+#     msg: "After Error"
+#   tags: [ignore_error_module]
+
+
+# - name: ---- update all package ----
+#   yum:
+#     name: *
+#     state: latest
+#   async: 7500
+#   poll: 5 # every 5 second check the task and 0 for dont check that
+#   tags: [async_module]
+
+
+- name: --- wait for connection ----
+  wait_for_connection:
+    timeout: 10
+    delay: 10
+    sleep: 5
+  tags: [wait_for_connection_module]
+
+- name: reboot machine
+  shell: 'reboot'
+  tags: [reboot_machines]
+
+
+
+- name: --- wait for connection after reboot  ----
+  wait_for_connection:
+    timeout: 300
+    delay: 5
+    sleep: 5
+  tags: [reboot_machines]
+
+- name: ---- after Reboot ----
+  debug:
+    msg: "After Reboot"
+  tags: [reboot_machines]
+
+
+
+- name: ----  Reboot module----
+  reboot:
+    reboot_timeout: 300
+  tags: [reboot_module]
+
+
+- name: git module
+  git:
+    repo: https://github.com/mohammadrezachegini/NodeJS-Projects
+    dest: /opt/
+    # revision: v1.0
+  tags: [git_mode]
+
+
+- name: set timezone to vancouver
+  timezone:
+    name: America/Vancouver
+  tags: [timezone_module]
+
+
+
+
+- name: Install MariaDB on Rocky
+  yum:
+    name: mariadb-server
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [install-mariadb]
+
+- name: Install MariaDB on Ubuntu
+  apt:
+    name: mariadb-server
+    state: present
+    update_cache: yes
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [install-mariadb]
+
+- name: Enable and start MariaDB service
+  service:
+    name: mariadb
+    enabled: yes
+    state: started
+  tags: [enable-mariadb]
+
+- name: Install MySQL Python library on RedHat-based systems
+  package:
+    name: python3-PyMySQL
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [install-mysql-python]
+
+- name: Install MySQL Python library on Ubuntu
+  apt:
+    name: python3-mysqldb
+    state: present
+    update_cache: yes
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [install-mysql-python]
+
+- name: Create a database
+  mysql_db:
+    name: mydb
+    state: present
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  tags: [mysql_db_module]
+
+- name: Dump the database
+  mysql_db:
+    name: mydb
+    state: dump
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+    target: /home/reza/mysql_dump.sql
+  tags: [mysql_db_dump]
+
+
+- name: restore db
+  mysql_db:
+    name: mydb
+    state: import
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+    target: /home/reza/mysql_dump.sql
+  tags: [restore_db]
+
+
+- name: create mysql user
+  mysql_user:
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+    name: reza
+    password: asd
+    priv: 'mydb.*:ALL'
+    state: present
+  tags: [mysql_user]
+
+- name: find module
+  find:
+    paths: /home/reza
+    pattern: '*.txt,*.conf'
+  tags: [find_mod]
+
+- name: local avtion
+  local_action:
+    module: file
+    path: /home/reza/test7
+    state: touch
+  tags: [local_action]
+
+
+- name: Query package list for Nginx on RedHat-based systems
+  shell: rpm -qa | grep nginx
+  register: nginx_package
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [check_nginx_server]
+
+- name: Query package list for Nginx on Debian-based systems
+  shell: dpkg -l | grep nginx
+  register: nginx_package
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [check_nginx_server]
+
+- name: Debug the query result
+  debug:
+    msg: "{{ nginx_package.stdout_lines | default([]) }}"
+  tags: [check_nginx_server]
+
+- name: Check if Nginx is installed
+  debug:
+    msg: "Nginx is installed"
+  when: nginx_package.stdout is defined and ('nginx' in nginx_package.stdout)
+  tags: [check_nginx_server]
+
+
+- name: gather package fact
+  package_facts:
+    manager: auto
+  tags: [check_nginx_fact]
+
+- name: Check if Nginx is installed
+  debug:
+    var: ansible_facts.packages['nginx']
+  tags: [check_nginx_fact]
+
+- name: check if variable is definded
+  pause:
+    prompt: "is it there?"
+  register: backup_path2
+  when: backup_path is not defined
+  tags: [pause_mod]
+
+ 
+- name: cat/home/txt
+  shell: cat /home/reza/text1.txt
+  register: catty
+  tags: [cat_cond]
+
+- name: check if is there
+  debug:
+    msg: "test1 contains ansible"
+  when: catty.stdout.find('Ansible') != -1
+  tags: [cat_cond]
+
+
+
+- name: if var1 or var2 is true
+  shell: echo "var1"
+  when: var1 or var2 | bool
+  tags: [cond3]
+
+
+- name: create a1 and a2 at /home/reza
+  file:
+    path: /home/reza/{{item}}
+    state: touch
+  with_items:
+    - a1
+    - a2
+  tags: [loop1]
+
+
+- name: Install gcc and vim on RedHat-based systems
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - vim
+    - gcc
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [loop2]
+
+- name: Install gcc and vim on Debian-based systems
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  with_items:
+    - vim
+    - gcc
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [loop2]
+
+
+- name: Install gcc and vim on RedHat-based systems
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - vim
+    - gcc
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [loop2]
+
+- name: Install gcc and vim on Debian-based systems
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  with_items:
+    - vim
+    - gcc
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [loop2]
+
+
+
+- name: Install gcc and vim on RedHat-based systems
+  yum:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+  with_items:
+    - {name: 'nginx', state: 'latest'}
+    - {name: 'httpd', state: 'absent'}
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [loop3]
+
+- name: Install gcc and vim on Debian-based systems
+  apt:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+    update_cache: yes
+  with_items:
+    - {name: 'nginx', state: 'latest'}
+    - {name: 'apache', state: 'absent'}
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [loop3]
+
+
+- name: create use db
+  mysql_user:
+    name: '{{ item[0] }}'
+    priv: '{{ item[1] }}.*:ALL'
+    append_privs: yes
+    password: 12345
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  with_nested:
+    - ['sayahi','chegini']
+    - ['clientdb', 'employerdb','providedb']
+  tags: [loop_nested]
+
+
+
+- name: loop over dictionary
+  debug:
+    msg: "{{item.key}} - {{item.value}}"
+  loop: "{{my_dict | dict2items}}"
+  tags: loop_nested
+
+
+
+- name: loop over dictionary
+  debug:
+    msg: "{{item}}"
+  loop: "{{groups['myservers']}}"
+  tags: loop10
+
+- name: loop over dictionary
+  debug:
+    msg: "{{item}}"
+  loop: "{{groups['all']}}"
+  tags: loop11
+
+- name: loop over dictionary
+  debug:
+    msg: "{{item}}"
+  loop: "{{ansible_play_batch}}" 
+  tags: loop12
+
+
+- name: loop over dictionary
+  debug:
+    msg: "{{item}}"
+  loop: "{{ ansible_play_batch if ansible_play_batch else groups['all'] }}"
+  tags: loop13
+
+- name: pause whitin loops
+  debug:
+    msg: "{{item}}"
+  loop: "{{groups['all']}}"
+  loop_control:
+    pause: 10
+  tags: loop14
+
+
+- name: loops and index
+  debug:
+    msg: "the {{item}} index is {{my_index}}"
+  loop:
+    - first
+    - second
+    - third
+  loop_control:
+    index_var: my_index
+  tags: loop15
+
+
+- name: retry a task until it meets a certain condition
+  shell: cat /home/reza/test.txt
+  register: catty
+  until: catty.stdout.find("ansible") != -1
+  retries: 3
+  delay: 10
+  tags: loop16
+
+
+
+
+- name: ---- Copy NGINX config for Ubuntu ----
+  template:
+    src: templates/ubuntu-nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    backup: yes
+  when: ansible_facts['os_family'] == "Debian"
+  notfiy:
+    - restart nginx
+  tags: [template_module1]
+
+- name: ---- Copy NGINX config for Rocky or CentOS ----
+  template:
+    src: templates/rocky-nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    backup: yes
+  when: ansible_facts['os_family'] == "RedHat"
+  notfiy:
+    - restart nginx
+  tags: [template_module1]

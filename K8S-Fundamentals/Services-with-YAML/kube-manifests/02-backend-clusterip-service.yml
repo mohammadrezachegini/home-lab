@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-backend-service
+  labels:
+    app: backend-restapp
+    tier: backend
+spec:
+  #type: Cluster IP is a default service
+  selector:
+    app: backend-restapp
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080

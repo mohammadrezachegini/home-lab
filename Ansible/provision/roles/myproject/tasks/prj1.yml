@@ -1,0 +1,4 @@
+- hosts: myservers
+  roles:
+    - prj1
+- import_playbook: prj2.yml

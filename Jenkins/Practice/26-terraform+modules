@@ -1,0 +1,28 @@
+pipeline{
+    agent any
+    environment{
+        cred = credentials('aws-key')
+    }
+    stages{
+        stage('checkout'){
+            steps{
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/mohammadrezachegini/Node-JS-Jenkins']])
+            }
+        }
+        stage('Init'){
+            steps{
+                sh 'terraform init'
+            }
+        }
+        stage('Plan'){
+            steps{
+                sh 'terraform plan'
+            }
+        }
+        stage('Apply'){
+            steps{
+                sh 'terraform apply -auto-approve'
+            }
+        }
+    }
+}

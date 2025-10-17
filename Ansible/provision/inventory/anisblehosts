@@ -1,0 +1,26 @@
+[myservers]
+192.168.68.3 ansible_user=reza
+192.168.68.4 ansible_user=reza
+
+[myservers:vars]
+http_port=8080
+
+[Group_A]
+192.168.68.3 ansible_user=reza
+192.168.68.4 http_port=8081 ansible_user=reza
+
+[Group_B]
+192.168.68.3 ansible_user=reza
+192.168.68.4 ansible_user=reza
+
+[Group_A:vars]
+http_port=8080
+ansible_group_priority=5
+
+[Group_B:vars]
+http_port=8080
+ansible_group_priority=3
+
+[myservers:children]
+Group_A
+Group_B

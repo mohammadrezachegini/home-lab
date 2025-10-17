@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: ./ # Assumes Dockerfile is in the same directory as docker-compose.yml
+      dockerfile: Dockerfile # Path to your Dockerfile
+    container_name: nodejs-app
+    ports:
+      - "3000:3000" # Maps port 3000 on the host to port 3000 in the container
+    environment:
+      - PORT=3000
+      - MONGO_URL=mongodb://mongo:27017/CSIS4495 # Environment variable for MongoDB URI
+    depends_on:
+      - mongo # Ensures MongoDB starts before the Node.js app
+    volumes:
+      - .:/usr/src/app # Mount the current directory to /usr/src/app
+      - /usr/src/app/node_modules
+    restart: always # Automatically restarts the app if it crashes
+
+  mongo:
+    image: mongo:6.0 # Official MongoDB image
+    container_name: mongodb
+    ports:
+      - "27017:27017" # Maps MongoDB port to the host
+    volumes:
+      - mongo-data:/data/db # Persistent volume for MongoDB data
+    restart: always
+
+volumes:
+  mongo-data:

@@ -1,0 +1,15 @@
+pipeline{
+    agent any
+    stages{
+        stage('test email'){
+            steps{
+                echo "hello"
+            }
+        }
+    }
+    post {
+        always {
+            emailext body: 'Job is completed', subject: 'job status', to: 'devopsworking@sharklasers.com'
+        }
+    }
+}

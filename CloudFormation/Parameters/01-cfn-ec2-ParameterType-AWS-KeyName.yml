@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Basic EC2 Instance.
+
+Parameters:
+  MyKeyName:
+    Description: Select the Key Name to be used for the instance.
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+  DevEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-063d43db0594b521b
+      InstanceType: t2.micro
+      KeyName: !Ref MyKeyName
+      SecurityGroups:
+      - default
+      - !Ref SSHSecurityGroup
+
+      SSHSecurityGroup:
+        Type: AWS::EC2::SecurityGroups
+        Properties:
+          GroupDescription: My new ssh securityGroups
+          SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '22'
+            ToPort: '22'
+            CidrIp: 0.0.0.0/0

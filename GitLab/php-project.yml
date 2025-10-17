@@ -1,0 +1,61 @@
+stages:
+- build
+- lint
+- test
+- package
+- deploy
+build:
+  stage: build
+  image: composer:latest
+  tags:
+  - ec2
+  - php
+  script:
+  - composer install
+
+lint:
+  stage: lint
+  tags:
+  - ec2
+  - php
+  script:
+  - php -l public/index.php # checks syntax
+
+sast:
+  stage: test
+include:
+- template: Jobs/SAST.gitlab-ci.yml
+
+package:
+  stage: package
+  image: docker:20.10.16
+  services:
+  - docker:20.10.16-dind # docker inside docker
+  before_script:
+  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD registry.gitlab.com
+  script:
+  - docker build -t registry.gitlab.com/lowyiiii/php-test-project .
+  - docker push registry.gitlab.com/lowyiiii/php-test-project
+
+deploy:
+  stage: deploy
+  tags:
+  - ec2
+  - php
+  image: amazon/aws-cli
+  entrypoint: [ "" ]
+  before_script:
+  # kubectl installation
+  - curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.30.2/2024-07-12/bin/linux/amd64/kubectl
+  - curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.30.2/2024-07-12/bin/linux/amd64/kubectl.sha256
+  - sha256sum -c kubectl.sha256
+  - chmod +x ./kubectl
+  - mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$HOME/bin:$PATH
+  - echo 'export PATH=$HOME/bin:$PATH' >> ~/.bashrc
+  script:
+  - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+  - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+  - aws configure set default_region $AWS_DEFAULT_REGION
+  - aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name php-cluster
+  - kubectl apply -f Application.yaml
+  - kubectl get pods

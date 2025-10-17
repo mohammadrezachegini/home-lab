@@ -1,0 +1,40 @@
+pipeline {
+    agent any
+    options {
+        buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '7', numToKeepStr: '2')
+    }
+    tools{
+        nodejs 'NodeJs'
+    }
+    environment {
+        dockercred = credentials('docker-hub')
+    }
+    stages {
+        stage('CheckOut ') {
+            steps {
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/mohammadrezachegini/Node-JS-Jenkins/']])
+            }
+        }
+        
+        stage('node stage'){
+            steps{
+                sh 'node -v'
+                sh 'npm -v'
+                sh 'npm install'
+            }
+        }
+        stage('Docker build'){
+            steps{
+                sh 'docker -v'
+                sh 'docker build -t lowyiiii/jenkins-nodejs:latest .'
+                sh 'echo $dockercred_PSW | docker login -u $dockercred_USR --password-stdin'
+                sh 'docker push lowyiiii/jenkins-nodejs:latest'
+            }
+        }
+        stage('kubectl stage'){
+            steps{
+                sh 'kubectl apply -f Application.yaml'
+            }
+        }
+    }
+}

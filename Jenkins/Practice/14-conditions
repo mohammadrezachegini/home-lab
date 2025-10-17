@@ -1,0 +1,18 @@
+pipeline{
+    agent any
+    stages{
+        stage('vote eligibility'){
+            steps{
+                script{
+                    def age = 40
+                    if (age >= 18){
+                        echo "Congrats, You are eligible to vote"
+                    }
+                    else{
+                        echo "Sorry, you can't vote"
+                    }
+                }
+            }
+        }
+    }
+}

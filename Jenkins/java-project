@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+    environment{
+        cred = credentials('aws-key')
+    }
+    tools {
+        maven 'Maven' // Ensure 'Default Maven' is configured in Jenkins
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scmGit(
+                    branches: [[name: '*/main']],
+                    extensions: [],
+                    userRemoteConfigs: [[url: 'https://github.com/mohammadrezachegini/Super-Project/']]
+                )
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def mvn = tool 'Maven' // Path to Maven tool
+                    // Ensure 'SonarQube' matches Jenkins configuration
+                        sh """
+                        ${mvn}/bin/mvn clean verify sonar:sonar \
+                        -Dsonar.projectKey=superprojects \
+                        -Dsonar.projectName='superprojects' \
+                        -Dsonar.host.url=http://localhost:9000 \
+                        -Dsonar.login=squ_87a839689fc6fcfe0b28cbcc974c673576ab2641
+                        """
+                    
+                }
+            }
+        }
+        stage('Maven build'){
+            steps{
+                sh 'mvn package'
+            }
+        }
+        
+        stage('Nexus'){
+            steps{
+                nexusArtifactUploader(
+                    nexusVersion: 'nexus3',               // Specify Nexus version
+                    protocol: 'http',                     // Protocol (http or https)
+                    nexusUrl: '127.0.0.1:8081',       // Nexus server URL
+                    groupId: 'addressbook',               // Group ID for artifact
+                    version: '2.0-SNAPSHOT',              // Artifact version
+                    repository: 'maven-snapshots',        // Repository name
+                    credentialsId: 'nexus',               // Credentials ID for Nexus
+                    artifacts: [[
+                        artifactId: 'superproject',       // Artifact ID
+                        type: 'war',                     // Artifact type
+                        classifier: 'debug',             // Optional classifier
+                        file: 'target/addressbook-2.0.war' // Path to the artifact
+                    ]]
+                )
+            }
+        }
+        stage('Docker Build'){
+            steps{
+                sh 'docker build -t 381492238320.dkr.ecr.us-east-2.amazonaws.com/super-projects:${BUILD_NUMBER} .'
+            }
+        }
+        stage('Docker Push'){
+            steps{
+                sh 'aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 381492238320.dkr.ecr.us-east-2.amazonaws.com'
+                sh 'docker push 381492238320.dkr.ecr.us-east-2.amazonaws.com/super-projects:${BUILD_NUMBER}'
+                sh 'docker tag  381492238320.dkr.ecr.us-east-2.amazonaws.com/super-projects:${BUILD_NUMBER} 381492238320.dkr.ecr.us-east-2.amazonaws.com/super-projects:latest'
+                sh 'docker push 381492238320.dkr.ecr.us-east-2.amazonaws.com/super-projects:latest'
+            }
+        }
+        // stage('k8s deployment'){
+        //     steps{
+        //         sh 'minikube start'
+        //     }
+        // }
+        stage('k8s deployment'){
+            steps{
+                sh 'kubectl apply -f Application.yaml'
+            }
+        }
+    }
+    post {
+        
+        always {
+            echo "job completed"
+        }
+        success {
+            echo "job successed"
+        }
+        failure {
+            echo "job failed"
+        }
+    }
+
+}

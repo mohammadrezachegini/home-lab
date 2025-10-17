@@ -1,0 +1,6 @@
+gcp_project     = "terraform-gcp-438417"
+gcp_region1     = "us-central1"
+machine_type    = "e2-micro"
+environment     = "dev"
+business_divsion = "hr"
+gcp_notification_email = "reza.dev.1994@gmail.com"

@@ -1,0 +1,379 @@
+#   tags:
+#     - docker
+#     - macos
+#     - personal
+
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+
+# stages:
+#   - maven-build
+#   - maven-test
+#   - package-stage
+#   - docker-build-stage
+#   - docker-push-stage
+#   - docker-container-stage
+
+# .maven-compiled:
+#     stage: maven-build
+#     tags:
+#       - macos
+#       - persoanl
+#       - shell
+#     script:
+#         -   mvn compile
+
+# .maven-test:
+#     stage: maven-test
+#     tags:
+#       - macos
+#       - persoanl
+#       - shell
+#     script:
+#         -   mvn test
+#     artifacts:
+#       reports:
+#         junit: target/surefire-reports/*.xml
+#       untracked: false
+#       when: on_success
+#       access: all
+#       expire_in: 30 days
+
+# package-job:
+#   stage: package-stage
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     - mvn package -s settings.xml
+#     - ls target
+#   artifacts:
+#     paths:
+#       - "target/*.war"
+#     expire_in: 30 days
+# docker-build-job:
+#   stage: docker-build-stage
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     - docker build -t registry.gitlab.com/lowyiiii/tools-test:$CI_PIPELINE_IID .
+#     # - docker build -t lowyiiii/gitlabtools:$CI_PIPELINE_IID .
+#   after_script:
+#     - docker images
+
+# .docker-push-job:
+#   stage: docker-push-stage
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     - echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+#     - docker push lowyiiii/gitlabtools:$CI_PIPELINE_IID
+
+# docker-push-job:
+#   stage: docker-container-stage
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD registry.gitlab.com
+#     - docker push registry.gitlab.com/lowyiiii/tools-test:$CI_PIPELINE_IID
+
+.stages:
+- maven-build
+- maven-test
+- package-stage
+- docker-build-stage
+- docker-push-stage
+- docker-container-stage
+
+.maven-compiled:
+  stage: maven-build
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  - mvn compile
+
+.maven-test:
+  stage: maven-test
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  - mvn test
+  artifacts:
+    reports:
+      junit: target/surefire-reports/*.xml
+    untracked: false
+    when: on_success
+    access: all
+    expire_in: 30 days
+
+.package-job:
+  stage: package-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  - mvn package -s settings.xml
+  - ls target
+  artifacts:
+    paths:
+    - "target/*.war"
+    expire_in: 30 days
+
+.docker-build-job:
+  stage: docker-build-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  # - docker build -t registry.192.168.68.2:9092/root/test:$CI_PIPELINE_IID .
+  - docker build -t lowyiiii/gitlabtools:$CI_PIPELINE_IID .
+  after_script:
+  - docker images
+
+.docker-push-job:
+  stage: docker-push-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push lowyiiii/gitlabtools:$CI_PIPELINE_IID
+
+.docker-push-jobq:
+  stage: docker-container-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER --password-stdin registry.192.168.68.2:9092
+  - docker push registry.192.168.68.2:9092/root/test:$CI_PIPELINE_IID
+
+.sonarqube-check:
+  image: maven:3.6.3-jdk-11
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache
+    GIT_DEPTH: "0" # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+    - .sonar/cache
+  script:
+  - mvn verify sonar:sonar -Dsonar.projectKey=root_test_AZOKVHhuL2aw2rzHZn9m
+  allow_failure: true
+  only:
+  - main
+
+# stages:
+# # - build
+# - test
+# # - deploy
+# # - review
+# # - dast
+# # - staging
+# # - canary
+# # - production
+# # - incremental rollout 10%
+# # - incremental rollout 25%
+# # - incremental rollout 50%
+# # - incremental rollout 100%
+# # - performance
+# # - cleanup
+# sast:
+#   stage: test
+# include:
+# - template: Auto-DevOps.gitlab-ci.yml
+
+# stages:
+#   - package-stage
+#   - docker-build-stage
+#   - docker-push-stage
+#   - k8s-check
+#   - terraform-check
+
+# package-job:
+#   stage: package-stage
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     - mvn package -s settings.xml
+#     - ls target
+#   artifacts:
+#     paths:
+#       - "target/*.war"
+#     expire_in: 30 days
+
+# docker-build-job:
+#   stage: docker-build-stage
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     # - docker build -t registry.192.168.68.2:9092/root/test:$CI_PIPELINE_IID .
+#     - docker build -t lowyiiii/gitlabtools:$CI_PIPELINE_IID .
+#   after_script:
+#     - docker images
+
+# docker-push-job:
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   stage: docker-push-stage
+#   script:
+#     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+#     - docker push lowyiiii/gitlabtools:$CI_PIPELINE_IID
+
+# k8s-check:
+#   stage: k8s-check
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     kubectl version
+
+
+
+# terraform-check:
+#   stage: terraform-check
+#   tags:
+#     - macos
+#     - persoanl
+#     - shell
+#   script:
+#     terraform version
+
+
+########################## JAVA PRoject ##########################
+
+
+stages:
+- maven-test-stage
+- maven-deploy-stage
+- sonarqube-stage
+- odcker-build-stage
+- docker-push-stage
+- docker-run-stage
+- aws-confiuration-stage
+- kubernetes-stage
+
+maven-test-job:
+  stage: maven-test-stage
+  tags:
+  - macos
+  - personal
+  - shell
+  before_script:
+  - mvn -v
+  script:
+  - mvn clean pacakge
+  - mvn test
+  artifacts:
+    name: war
+    paths:
+    - "target/my-webapp.war"
+    reports:
+      junit:
+      - tareget/surfire-reports/TEST.com.example.AppTetst-junit.xml
+      - tareget/surfire-reports/TEST.com.example.MyServiceTest-junit.xml
+    untracked: false
+    when: on_success
+    access: all
+    expire_in: 30 days
+
+maven-deploy-job:
+  stage: maven-0deploy-stage
+  tags:
+  - macos
+  - personal
+  - shell
+  script:
+  - mvn deploy -s settings.xml
+
+sonarqube-check:
+  stage: sonarqube-stage
+  image: maven:3.6.3-jdk-11
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache
+    GIT_DEPTH: "0" # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+    - .sonar/cache
+  script:
+  - mvn verify sonar:sonar -Dsonar.projectKey=root_test_AZOKVHhuL2aw2rzHZn9m
+  allow_failure: true
+  only:
+  - main
+
+docker-build-job:
+  stage: docker-build-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  # - docker build -t registry.192.168.68.2:9092/root/test:$CI_PIPELINE_IID .
+  - docker build -t lowyiiii/gitlabtools:$CI_PIPELINE_IID .
+  after_script:
+  - docker images
+
+docker-push-job:
+  stage: docker-push-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+
+  script:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push lowyiiii/gitlabtools:$CI_PIPELINE_IID
+
+docker-run-job:
+  stage: docker-run-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script: docker run -d -p 80:8081 lowyiiii/gitlabtools:latest
+
+aws-configuration-job:
+  stage: aws-configuration-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  - aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+  - aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+  - aws configure set default_region ${AWS_DEFAULT_REGION}
+
+kubernetes-job:
+  stage: kubernetes-stage
+  tags:
+  - macos
+  - persoanl
+  - shell
+  script:
+  - aws eks update-kubeconfig --region us-east-1 --name project-work
+  - kubectl apply -f Application.yaml

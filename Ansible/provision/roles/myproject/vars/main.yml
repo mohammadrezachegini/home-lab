@@ -1,0 +1,16 @@
+user:
+  name: devops
+  email: reza@reza.com
+user_list:
+  - Mohammad
+  - Reza
+  - Mohammad Reza
+
+backup_path: /home/reza/
+user_list2: [Tocino,Burro,Gordo]
+myvarinbash: salamchetori
+
+var1: true
+var2: "no"
+mysql_root_user: root
+mysql_root_password: asd

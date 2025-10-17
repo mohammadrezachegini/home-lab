@@ -1,0 +1,22 @@
+pipeline{
+    agent any
+    stages{
+        stage('Checkout'){
+            steps{
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/mohammadrezachegini/Node-JS-Jenkins']])
+
+            }
+        }
+        stage('script usage'){
+            steps{
+                script{
+                    def values = ['uat', 'dev' , 'prod']
+                    sh 'chmod +x helloworld.sh'
+                    for (name in values) {
+                        sh "sh helloworld.sh ${name}"
+                    }
+                }
+            }
+        }
+    }
+}

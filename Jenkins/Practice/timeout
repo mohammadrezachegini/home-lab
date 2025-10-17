@@ -1,0 +1,15 @@
+pipeline{
+    agent any
+    options {
+        timeout(activity: true, time: 7, unit: 'SECONDS')
+    }
+    stages{
+        stage('timeout checkout'){
+            steps{
+                script{
+                    def test = input id: 'State', message: 'You are ready', submitter: 'admin'
+                }
+            }
+        }
+    }
+}

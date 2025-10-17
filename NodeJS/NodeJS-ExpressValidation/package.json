@@ -1,0 +1,25 @@
+{
+  "name": "expressvalidation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohammadrezachegini/NodeJS-ExpressValidation.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mohammadrezachegini/NodeJS-ExpressValidation/issues"
+  },
+  "homepage": "https://github.com/mohammadrezachegini/NodeJS-ExpressValidation#readme",
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-validation": "^4.1.0",
+    "nodemon": "^2.0.21"
+  }
+}

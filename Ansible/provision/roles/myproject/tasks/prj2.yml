@@ -1,0 +1,4 @@
+- name: loop over dictionary
+  debug:
+    msg: "hey hopw are you"
+  tags: msg1

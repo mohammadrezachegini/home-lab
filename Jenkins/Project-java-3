@@ -1,0 +1,84 @@
+pipeline{
+    agent any
+    options {
+        buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '30', numToKeepStr: '2')
+    }
+    tools{
+        maven 'Maven'
+    }
+    environment{
+        cred = credentials('aws-key')
+    }
+    stages{
+        stage('Checkout stage'){
+            steps{
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/mohammadrezachegini/Node-JS-Jenkins']])
+            }
+        }
+        stage('sonar test') {
+            steps{
+                script{
+                    def mvn = tool 'Maven';
+                    withSonarQubeEnv(installationName: 'sonarqube-server') {
+                        sh "${mvn}/bin/mvn clean verify sonar:sonar -Dsonar.projectKey=superproject -Dsonar.projectName='superproject'"
+                    }
+                }    
+            }     
+        }
+        stage('maven build'){
+            steps{
+                sh 'mvn package'
+            }
+        }
+        stage('nexus test'){
+            steps{
+                nexusArtifactUploader(
+                    nexusVersion: 'nexus3',
+                    protocol: 'http',
+                    nexusUrl: '3.145.207.162:8081',
+                    groupId: 'addressbook',
+                    version: '2.0-SNAPSHOT',
+                    repository: 'maven-snapshots',
+                    credentialsId: 'nexus',
+                    artifacts: [
+                        [artifactId: 'SuperProject',
+                        classifier: '',
+                        file: 'target/addressbook-2.0.war',
+                        type: 'war']
+                     ]
+                )
+            }
+        }
+        stage('Docker build'){
+            steps{
+                sh 'docker build -t super-project .'
+            }
+        }
+        stage('DockerHub push'){
+            steps{
+                sh 'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 381492204839.dkr.ecr.us-east-1.amazonaws.com'
+                sh "docker tag super-project:latest 381492204839.dkr.ecr.us-east-1.amazonaws.com/super-project:latest"
+                sh "docker push 381492204839.dkr.ecr.us-east-1.amazonaws.com/super-project:latest"
+                sh "docker tag super-project:latest 381492204839.dkr.ecr.us-east-1.amazonaws.com/super-project:${BUILD_NUMBER}"
+                sh "docker push 381492204839.dkr.ecr.us-east-1.amazonaws.com/super-project:${BUILD_NUMBER}"
+            }
+        }
+        stage('Kubernetes deploy'){
+            steps{
+                sh 'aws eks update-kubeconfig --region us-east-1 --name super-project'
+                sh 'kubectl apply -f Application.yaml'
+            }
+        }
+    }
+    post {
+        always {
+            echo "Job is completed"
+        }
+        success {
+            echo "success"
+        }
+        failure {
+            echo "failed"
+        }
+    }
+}

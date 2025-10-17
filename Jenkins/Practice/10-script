@@ -1,0 +1,14 @@
+pipeline{
+    agent any
+    stages{
+        stage('script usage'){
+            steps{
+                script{
+                    def age = 5
+                    def result = age * 2
+                    echo "Hello my age is ${result}"
+                }
+            }
+        }
+    }
+}

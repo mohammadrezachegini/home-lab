@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EnviromentName:
+    Description: Select the environment
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - prod
+    - qa
+    ConstraintDescription: must be development or production or qa
+
+Mappings:
+  MyRegionMap:
+    us-east-2:
+      HVM64: ami-013ce69c368262d19
+    us-west-1:
+      HVM64: ami-06f932bfd69e55cc3
+
+  MyEnvironmentMap:
+    dev:
+      InstanceType: t2.micro
+    prod:
+      InstanceType: t2.small
+    qa:
+      InstanceType: t2.medium
+
+Conditions:
+  CreateEIPForProd: !Equals [ !Ref EnviromentName, prod ]
+  CreateProdSecurityGroup: !Equals [ !Ref EnvironmentName, prod ]
+  CreateDevSecurityGroup: !Not [ { Condition: CreateProdSecurityGroup } ]
+  IfRegionUseKeyName: !And [ !Or [ !Equals [ !Ref "AWS::Region", us-east-2 ], !Equals [ !Ref "AWS::Region", us-west-1 ] ], !Equals [ !Ref EnvironmentName, dev ] ]
+
+Resources:
+  MyVMInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap
+        - MyRegionMap
+        - !Ref AWS::Region
+        - HVM64
+      InstanceType: !FindInMap
+        - MyEnvironmentMap
+        - !Ref EnviromentName
+        - InstanceType
+      KeyName: !If [ IfRegionUseKeyName, cfn-key-1, cfn-key-2 ]
+      SecurityGroups: !If [ CreateDevSecurityGroup, [ !Ref DevEnvSecurityGroups ], [ !Ref ProdEnvSecurityGroups ] ]
+
+  MyProdEIP:
+    Type: AWS::EC2::EIP
+    Condition: CreateEIPForProd
+    Properties:
+      InstanceId: !Ref MyVMInstance
+
+  DevEnvSecurityGroups:
+    Type: AWS::EC2::SecurityGroups
+    Condition: CreateDevSecurityGroup
+    Properties:
+      GroupDescription: DevSG
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: 0.0.0.0/0
+
+  ProdEnvSecurityGroups:
+    Type: AWS::EC2::SecurityGroups
+    Condition: CreateProdSecurityGroup
+    Properties:
+      GroupDescription: ProdSG
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: 0.0.0.0/0

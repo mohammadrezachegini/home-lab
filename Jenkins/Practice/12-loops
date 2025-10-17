@@ -1,0 +1,15 @@
+pipeline{
+    agent any
+    stages{
+        stage('loop usage'){
+            steps{
+                script{
+                    echo "Table of 5"
+                    for (int i = 1; i <= 10; i++) {
+                        echo "5 X ${i} = ${5 * i}"
+                    }    
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,15 @@
+pipeline{
+    agent any
+    environment{
+        cred = credentials('aws-key')
+    }
+    stages{
+        stage('kubernetes test'){
+            steps{
+                sh 'aws eks update-kubeconfig --region us-east-1 --name devops-working'
+                sh 'kubectl version'
+                sh 'kubectl get svc'
+            }
+        }
+    }
+}

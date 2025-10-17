@@ -1,0 +1,50 @@
+
+{
+    "results":[
+        {
+            "id":0,
+            "title":"Mr",
+            "firstName": "Kasper",
+            "lastName": "Ketola",
+            "email": "kasper.ketola@example.com",
+            "username": "goldenfish776",
+            "password": "invis"
+        },
+        {
+            "id":1,
+            "title":"Mr",
+            "firstName": "Cristian",
+            "lastName": "Carrasco",
+            "email": "cristian.carrasco@example.com",
+            "username": "crazyleopard728",
+            "password": "loco"
+        },
+        {
+            "id":2,
+            "title":"Mrs",
+            "firstName": "Isabella",
+            "lastName": "Pena",
+            "email": "isabella.pena@example.com",
+            "username": "silverbear459",
+            "password": "bigfoot"
+        },
+        {
+            "id":3,
+            "title":"Miss",
+            "firstName": "Alison",
+            "lastName": "Ross",
+            "email": "alison.ross@example.com",
+            "username": "smallelephant579",
+            "password": "coral"
+        },
+        {
+            "id":4,
+            "title":"Miss",
+            "firstName": "Elise",
+            "lastName": "Ngo",
+            "email": "elise.ngo@example.com",
+            "username": "blackcat932",
+            "password": "blue99"
+        }
+    ]
+}
