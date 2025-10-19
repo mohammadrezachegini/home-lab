@@ -220,18 +220,6 @@ Access monitoring in GCP Console:
 
 4. **Private Instances**: VMs have no external IPs and use Cloud NAT for outbound connectivity.
 
-## Cost Optimization
-
-Current configuration uses cost-effective resources:
-- Cloud SQL: db-f1-micro (0.6 GB RAM)
-- Compute instances: e2-medium (2 vCPU, 4 GB RAM)
-- Minimum replicas: 2
-
-For production, consider:
-- Regional availability for Cloud SQL
-- Larger instance types
-- Committed use discounts
-- Preemptible VMs for non-critical workloads
 
 ## Cleanup
 

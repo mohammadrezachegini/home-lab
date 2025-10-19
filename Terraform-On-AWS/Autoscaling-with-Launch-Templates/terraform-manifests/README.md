@@ -219,11 +219,6 @@ CloudWatch metrics tracked:
 - Target response time
 - Healthy/unhealthy host count
 
-## Cost Optimization
-
-- Single NAT Gateway (set `vpc_single_nat_gateway = true`)
-- t2.micro instances (free tier eligible)
-- Scheduled scaling to reduce costs during off-hours
 
 ## Cleanup
 

@@ -201,12 +201,6 @@ The private node group configuration is commented out by default. To enable:
 4. **IAM Roles**: Review and restrict IAM policies as per your security requirements
 5. **Logging**: EKS control plane logging is enabled for all log types
 
-## Cost Optimization
-
-- Single NAT Gateway is used (set `vpc_single_nat_gateway = true`)
-- Node groups use ON_DEMAND instances - consider SPOT for non-production
-- Minimum node count is set to 1 - adjust based on your needs
-- Instance types are t3.micro for bastion and t3.medium for nodes
 
 ## Cleanup
 

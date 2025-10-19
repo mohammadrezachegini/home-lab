@@ -184,11 +184,6 @@ terraform destroy
 - All traffic between ALB and instances is HTTP (within VPC)
 - SSL/TLS termination happens at the ALB
 
-## Cost Optimization
-
-- Single NAT Gateway is used (set `vpc_single_nat_gateway = true`)
-- Uses t2.micro instances (eligible for free tier)
-- Consider stopping/terminating resources when not in use
 
 ## Troubleshooting
 

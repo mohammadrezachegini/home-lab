@@ -3,7 +3,7 @@
 ## Overview
 Java-BookSystem is a Java application designed to manage and display book information. The application connects to a Microsoft Access database to retrieve and display details about books, including their titles, authors, and prices. This project demonstrates basic database operations in Java, such as connecting to a database, executing SQL queries, and processing result sets.
 
-## Features
+## Features 
 - **Database Connectivity:** Connects to a Microsoft Access database using JDBC.
 - **Book Information Retrieval:** Retrieves book information from the database and stores it in Java objects.
 - **Display Book Information:** Prints details of all books retrieved from the database, including titles, authors, and prices.
@@ -78,7 +78,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Troubleshooting
 - **Database Connection Issues:** Ensure that the `BookDB.accdb` file is in the correct directory and that the JDBC-ODBC bridge is properly configured.
 - **Compilation Errors:** Make sure you have the correct version of the JDK installed and that your `classpath` is set up correctly.
-
-## Contact
-For any issues or questions, please open an issue in the repository or contact the repository owner.
 

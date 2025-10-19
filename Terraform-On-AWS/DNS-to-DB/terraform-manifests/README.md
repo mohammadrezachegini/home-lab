@@ -229,25 +229,7 @@ mysql -h <rds-endpoint> -u dbadmin -p
 - **RDS CloudWatch Logs**: General logs enabled
 - **Enhanced Monitoring**: 60-second interval
 
-## Cost Optimization
 
-- Single NAT Gateway (instead of per-AZ)
-- t2.micro instances (adjust for production)
-- RDS backup retention set to 0 (increase for production)
-- Deletion protection disabled (enable for production)
-
-## Production Considerations
-
-Before using in production:
-
-1. **Enable Deletion Protection**: Set `deletion_protection = true` for ALB and RDS
-2. **Increase Backup Retention**: Set `backup_retention_period = 7` or higher
-3. **Multi-NAT Gateway**: Use `vpc_single_nat_gateway = false` for high availability
-4. **Instance Sizing**: Adjust instance types based on workload
-5. **Monitoring**: Enable comprehensive CloudWatch monitoring
-6. **Secrets Management**: Use AWS Secrets Manager instead of tfvars files
-7. **State Backend**: Configure remote state backend (S3 + DynamoDB)
-8. **Auto Scaling**: Add Auto Scaling Groups for dynamic capacity
 
 ## Cleanup
 

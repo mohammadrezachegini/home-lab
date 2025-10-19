@@ -231,13 +231,6 @@ stress --cpu 4 --timeout 600
 - All traffic uses security groups for defense-in-depth
 - HTTPS enforced with automatic HTTP to HTTPS redirect
 
-## Cost Optimization
-
-- Single NAT Gateway enabled (not HA, for cost savings)
-- T2.micro instances used (free tier eligible)
-- Auto Scaling ensures you only run instances when needed
-- Scheduled scaling reduces costs during off-hours
-
 ## Cleanup
 
 To destroy all resources:

@@ -180,12 +180,6 @@ Check instance group status:
 gcloud compute instance-groups managed describe hr-dev-myapp1-mig --region=us-central1
 ```
 
-## Cost Optimization
-
-- Uses `e2-micro` instances (lowest cost tier)
-- No external IPs assigned to instances (uses Cloud NAT)
-- Auto-scaling prevents over-provisioning
-- Regional resources (less expensive than global)
 
 ## Security Considerations
 

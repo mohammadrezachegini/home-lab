@@ -210,12 +210,6 @@ Receive email alerts for:
 - **Healthy threshold**: 3 consecutive successes
 - **Unhealthy threshold**: 3 consecutive failures
 
-## Cost Optimization
-
-- Single NAT Gateway configuration (set `vpc_single_nat_gateway = true`)
-- t2.micro instances for development
-- Scheduled scaling to reduce costs during off-hours
-- Deletion protection disabled for easy cleanup
 
 ## Cleanup
 

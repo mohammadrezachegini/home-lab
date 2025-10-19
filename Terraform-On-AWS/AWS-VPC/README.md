@@ -138,15 +138,6 @@ Resources are tagged with:
 - **Type**: Subnet classification
 - **Owner**: Resource owner
 
-## Cost Optimization
-
-The default configuration uses a **single NAT Gateway** to minimize costs. For production environments requiring high availability, consider:
-
-```hcl
-vpc_single_nat_gateway = false  # Deploy NAT Gateway in each AZ
-```
-
-Note: Multiple NAT Gateways will increase costs but provide better redundancy.
 
 ## Module Versions
 

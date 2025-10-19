@@ -195,16 +195,6 @@ Type `yes` when prompted to confirm.
 - Health check source ranges are restricted to Google's IP ranges
 - Consider implementing HTTPS with SSL certificates for production use
 
-## Cost Optimization
-
-This configuration uses:
-- `e2-micro` instances (cost-effective for demos)
-- Minimum of 2 replicas per MIG
-- Regional resources (lower cost than global)
-
-For production, consider:
-- Right-sizing instance types based on actual workload
-- Adjusting min/max replicas based on traffic patterns
 - Implementing committed use discounts
 
 ## Troubleshooting

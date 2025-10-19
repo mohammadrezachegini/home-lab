@@ -10,7 +10,7 @@ Java-GPACalculator is a console-based application designed to manage and display
 - **User-friendly Interface:** Simple and intuitive console interface for ease of use.
 - **Dynamic File Handling:** Automatically reads student data from text files.
 
-## Requirements
+## Requirements 
 - Java Development Kit (JDK) 8 or higher
 
 ## Installation

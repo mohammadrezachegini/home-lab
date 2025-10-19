@@ -216,13 +216,6 @@ project = "ubuntu-os-cloud"
 family  = "ubuntu-2004-lts"
 ```
 
-## Cost Optimization
-
-- Uses `e2-micro` instances (free tier eligible)
-- Regional (not global) load balancer for lower cost
-- Cloud NAT auto-allocation (no reserved IPs)
-- Consider committed use discounts for production
-
 ## Cleanup
 
 To destroy all resources:

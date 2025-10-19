@@ -184,14 +184,6 @@ aws cloudformation create-stack \
   --parameters ParameterKey=EnvironmentName,ParameterValue=dev
 ```
 
-### Production CI/CD Pipeline
-```bash
-# Deploy complete CI/CD pipeline
-aws cloudformation create-stack \
-  --stack-name production-pipeline \
-  --template-body file://Continuous-Delivery/06-CFN-CI-CD-CodePipeline-ApprovalStage.yml \
-  --capabilities CAPABILITY_NAMED_IAM
-```
 
 ### Multi-Tier Application
 ```bash

@@ -1,0 +1,1182 @@
+# AWS Deployment with OpenID Connect Authentication
+
+## Overview
+
+This project demonstrates secure AWS deployment using OpenID Connect (OIDC) authentication instead of long-lived AWS access keys. It showcases a modern, security-focused CI/CD pipeline that eliminates the need to store AWS credentials as GitHub secrets, implementing temporary credential management through federated identity.
+
+The workflow implements a complete deployment pipeline with linting, testing, building, and deploying to AWS S3, using OIDC to assume an IAM role that provides temporary credentials. This approach significantly improves security posture by eliminating static credentials, implementing just-in-time access, and enabling fine-grained permission control through IAM roles.
+
+## GitHub Actions Concepts
+
+### OpenID Connect (OIDC)
+A federated identity protocol that allows GitHub Actions to authenticate with cloud providers without storing long-lived credentials.
+
+**How It Works**:
+1. GitHub Actions requests an OIDC token from GitHub
+2. GitHub signs the token with repository and workflow information
+3. AWS validates the token against configured trust policy
+4. AWS grants temporary credentials via IAM role assumption
+5. Workflow uses temporary credentials for AWS operations
+
+**Benefits**:
+- No static credentials to rotate
+- Automatic credential expiration
+- Audit trail of all access
+- Reduced attack surface
+
+### Custom Actions
+Reusable workflow components defined in `.github/actions/`:
+- **cached-deps**: Dependency caching logic
+- **deploy-s3-docker**: S3 deployment logic
+
+### Composite Actions
+Actions that combine multiple steps into a single reusable component.
+
+### Artifacts
+Build outputs shared between jobs:
+- **dist-files**: Built application files
+- **test-report**: Test failure reports
+
+### Permissions
+Fine-grained access control for GITHUB_TOKEN:
+- **id-token: write**: Required for OIDC token generation
+- **contents: read**: Repository code access
+
+### Job Dependencies
+Complex workflow with multiple dependency chains:
+```
+lint ──┐
+       ├──> build ──> deploy
+test ──┘
+```
+
+## Prerequisites
+
+### AWS Account Setup
+
+#### 1. Create IAM OIDC Identity Provider
+
+Navigate to AWS Console > IAM > Identity Providers:
+
+```bash
+# Or use AWS CLI
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+```
+
+**Configuration**:
+- **Provider URL**: `https://token.actions.githubusercontent.com`
+- **Audience**: `sts.amazonaws.com`
+
+#### 2. Create IAM Role for GitHub Actions
+
+Create a role with trust policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:YOUR_USERNAME/YOUR_REPO:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**More Restrictive (Production)**:
+```json
+"Condition": {
+  "StringEquals": {
+    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+    "token.actions.githubusercontent.com:sub": "repo:YOUR_USERNAME/YOUR_REPO:ref:refs/heads/main"
+  }
+}
+```
+
+#### 3. Attach IAM Policy to Role
+
+Create and attach policy for S3 access:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::gha-security-hosting-demo",
+        "arn:aws:s3:::gha-security-hosting-demo/*"
+      ]
+    }
+  ]
+}
+```
+
+#### 4. Create S3 Bucket
+
+```bash
+# Create bucket
+aws s3 mb s3://gha-security-hosting-demo --region us-east-1
+
+# Enable static website hosting
+aws s3 website s3://gha-security-hosting-demo \
+  --index-document index.html \
+  --error-document error.html
+
+# Set bucket policy for public read (if needed)
+aws s3api put-bucket-policy --bucket gha-security-hosting-demo --policy file://bucket-policy.json
+```
+
+**Bucket Policy** (bucket-policy.json):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::gha-security-hosting-demo/*"
+    }
+  ]
+}
+```
+
+### Repository Setup
+
+#### Required Directory Structure
+```
+your-repo/
+├── .github/
+│   ├── workflows/
+│   │   └── deploy-AWS-Permission-OpenID.yml
+│   └── actions/
+│       ├── cached-deps/
+│       │   └── action.yml
+│       └── deploy-s3-docker/
+│           ├── action.yml
+│           └── Dockerfile
+├── src/
+├── package.json
+├── package-lock.json
+└── dist/ (generated by build)
+```
+
+#### Custom Actions
+
+**Create `.github/actions/cached-deps/action.yml`**:
+```yaml
+name: 'Cache Dependencies'
+description: 'Install and cache npm dependencies'
+inputs:
+  caching:
+    description: 'Whether to cache dependencies'
+    required: false
+    default: 'true'
+outputs:
+  used-cache:
+    description: 'Whether cache was used'
+    value: ${{ steps.install.outputs.cache }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Cache dependencies
+      if: inputs.caching == 'true'
+      id: cache
+      uses: actions/cache@v3
+      with:
+        path: node_modules
+        key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+
+    - name: Install dependencies
+      id: install
+      if: steps.cache.outputs.cache-hit != 'true' || inputs.caching != 'true'
+      run: |
+        npm ci
+        echo "cache='${{ inputs.caching }}'" >> $GITHUB_OUTPUT
+      shell: bash
+```
+
+**Create `.github/actions/deploy-s3-docker/action.yml`**:
+```yaml
+name: 'Deploy to S3'
+description: 'Deploy static files to AWS S3 bucket'
+inputs:
+  bucket:
+    description: 'S3 bucket name'
+    required: true
+  dist-folder:
+    description: 'Folder containing files to deploy'
+    required: true
+  bucket-region:
+    description: 'AWS region for the bucket'
+    required: false
+    default: 'us-east-1'
+outputs:
+  website-url:
+    description: 'URL of deployed website'
+    value: ${{ steps.set-url.outputs.url }}
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+```
+
+**Create `.github/actions/deploy-s3-docker/Dockerfile`**:
+```dockerfile
+FROM python:3.9-slim
+
+RUN pip install awscli
+
+COPY deployment.py /deployment.py
+
+ENTRYPOINT ["python", "/deployment.py"]
+```
+
+**Create `.github/actions/deploy-s3-docker/deployment.py`**:
+```python
+import os
+import subprocess
+
+bucket = os.environ['INPUT_BUCKET']
+dist_folder = os.environ['INPUT_DIST-FOLDER']
+region = os.environ.get('INPUT_BUCKET-REGION', 'us-east-1')
+
+# Sync files to S3
+cmd = f"aws s3 sync {dist_folder} s3://{bucket} --delete"
+subprocess.run(cmd.split(), check=True)
+
+# Set output
+url = f"http://{bucket}.s3-website-{region}.amazonaws.com"
+with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+    f.write(f"url={url}\n")
+```
+
+### Package.json Configuration
+
+```json
+{
+  "name": "your-app",
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint src/",
+    "build": "webpack --mode production"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "eslint": "^8.0.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0"
+  }
+}
+```
+
+## Project Structure
+
+```
+deploy-AWS-Permission-OpenID/
+└── deploy-AWS-Permission-OpenID.yml    # Main workflow file
+```
+
+### Complete Repository Structure
+```
+your-repo/
+├── .github/
+│   ├── workflows/
+│   │   └── deploy-AWS-Permission-OpenID.yml
+│   └── actions/
+│       ├── cached-deps/
+│       │   └── action.yml
+│       └── deploy-s3-docker/
+│           ├── action.yml
+│           ├── Dockerfile
+│           └── deployment.py
+├── src/
+│   ├── index.js
+│   └── (other source files)
+├── package.json
+├── package-lock.json
+├── webpack.config.js
+└── .eslintrc.js
+```
+
+## Workflow Files
+
+### deploy-AWS-Permission-OpenID.yml
+
+**Purpose**: Complete CI/CD pipeline with OIDC authentication for secure AWS deployment.
+
+**Trigger Events**:
+- Push to `main` branch
+
+**Jobs**:
+
+#### 1. Lint Job
+
+Code quality and style checking:
+
+```yaml
+lint:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Get code
+    - name: Load & cache dependencies (with caching disabled)
+    - name: Output cache information
+    - name: Lint code
+```
+
+**Key Steps**:
+- Uses custom `cached-deps` action
+- Disables caching for lint job (`caching: 'false'`)
+- Outputs whether cache was used
+- Runs `npm run lint`
+
+#### 2. Test Job
+
+Runs test suite with artifact upload on failure:
+
+```yaml
+test:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Get code
+    - name: Load & cache dependencies
+    - name: Test code
+    - name: Upload test report (on failure)
+```
+
+**Features**:
+- Uses custom `cached-deps` action (caching enabled)
+- Captures test step outcome
+- Uploads test report only on failure
+- Conditional artifact upload: `if: failure() && steps.run-tests.outcome == 'failure'`
+
+#### 3. Build Job
+
+Builds application and uploads artifacts:
+
+```yaml
+build:
+  needs: test
+  runs-on: ubuntu-latest
+  steps:
+    - name: Get code
+    - name: Load & cache dependencies
+    - name: Build website
+    - name: Upload artifacts
+```
+
+**Purpose**:
+- Depends on successful test completion
+- Uses dependency caching
+- Runs `npm run build`
+- Uploads `dist` folder as artifact
+
+#### 4. Deploy Job
+
+Deploys to AWS S3 using OIDC authentication:
+
+```yaml
+deploy:
+  permissions:
+    id-token: write      # Required for OIDC
+    contents: read       # Required for checkout
+  needs: build
+  runs-on: ubuntu-latest
+  steps:
+    - name: Get code
+    - name: Get build artifacts
+    - name: Output contents
+    - name: Get AWS permissions
+    - name: Deploy site
+    - name: Output information
+```
+
+**Detailed Steps**:
+
+1. **Get Code**:
+   ```yaml
+   - name: Get code
+     uses: actions/checkout@v3
+   ```
+
+2. **Download Build Artifacts**:
+   ```yaml
+   - name: Get build artifacts
+     uses: actions/download-artifact@v3
+     with:
+       name: dist-files
+       path: ./dist
+   ```
+
+3. **OIDC Authentication** (Key Step):
+   ```yaml
+   - name: Get AWS permissions
+     uses: aws-actions/configure-aws-credentials@v1
+     with:
+       role-to-assume: arn:aws:iam::450226343468:role/GitHubDemo1
+       aws-region: us-east-1
+   ```
+
+   **What Happens**:
+   - GitHub generates OIDC token with workflow/repo info
+   - Action exchanges token for temporary AWS credentials
+   - Credentials valid for duration of job (typically 1 hour)
+   - No static credentials stored in GitHub
+
+4. **Deploy to S3**:
+   ```yaml
+   - name: Deploy site
+     id: deploy
+     uses: ./.github/actions/deploy-s3-docker
+     with:
+       bucket: gha-security-hosting-demo
+       dist-folder: ./dist
+   ```
+
+5. **Output Website URL**:
+   ```yaml
+   - name: Output information
+     run: |
+       echo "Live URL: ${{ steps.deploy.outputs.website-url }}"
+   ```
+
+## Usage
+
+### Initial Setup
+
+#### 1. Configure AWS OIDC Provider
+```bash
+# Create OIDC provider in AWS
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+```
+
+#### 2. Create IAM Role
+Save this as `trust-policy.json`:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/YOUR_REPO:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+Create role:
+```bash
+aws iam create-role \
+  --role-name GitHubActionsRole \
+  --assume-role-policy-document file://trust-policy.json
+```
+
+#### 3. Attach S3 Policy
+```bash
+# Create policy file
+cat > s3-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:*"],
+      "Resource": [
+        "arn:aws:s3:::YOUR_BUCKET_NAME",
+        "arn:aws:s3:::YOUR_BUCKET_NAME/*"
+      ]
+    }
+  ]
+}
+EOF
+
+# Create and attach policy
+aws iam put-role-policy \
+  --role-name GitHubActionsRole \
+  --policy-name S3DeploymentPolicy \
+  --policy-document file://s3-policy.json
+```
+
+#### 4. Create Custom Actions
+Create the directory structure and files as shown in the Repository Setup section.
+
+#### 5. Update Workflow
+Replace the role ARN in the workflow:
+```yaml
+role-to-assume: arn:aws:iam::YOUR_ACCOUNT_ID:role/GitHubActionsRole
+```
+
+Update bucket name:
+```yaml
+bucket: your-bucket-name
+```
+
+#### 6. Deploy
+```bash
+git add .
+git commit -m "Add AWS OIDC deployment workflow"
+git push origin main
+```
+
+### Monitoring Deployment
+
+1. **Check Workflow Run**:
+   - Go to Actions tab
+   - View running workflow
+   - Monitor each job's progress
+
+2. **Verify S3 Upload**:
+   ```bash
+   aws s3 ls s3://your-bucket-name/
+   ```
+
+3. **Test Website**:
+   ```bash
+   curl http://your-bucket-name.s3-website-us-east-1.amazonaws.com
+   ```
+
+4. **Check CloudWatch Logs** (if enabled):
+   ```bash
+   aws logs tail /aws/lambda/your-function --follow
+   ```
+
+### Advanced Configuration
+
+#### Multi-Environment Deployment
+
+```yaml
+deploy-staging:
+  environment: staging
+  permissions:
+    id-token: write
+    contents: read
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: arn:aws:iam::ACCOUNT:role/StagingRole
+        aws-region: us-east-1
+    - uses: ./.github/actions/deploy-s3-docker
+      with:
+        bucket: staging-bucket
+
+deploy-production:
+  environment: production
+  needs: deploy-staging
+  permissions:
+    id-token: write
+    contents: read
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: arn:aws:iam::ACCOUNT:role/ProductionRole
+        aws-region: us-east-1
+    - uses: ./.github/actions/deploy-s3-docker
+      with:
+        bucket: production-bucket
+```
+
+#### Branch-Specific Roles
+
+```yaml
+- name: Configure AWS Credentials
+  uses: aws-actions/configure-aws-credentials@v1
+  with:
+    role-to-assume: ${{ github.ref == 'refs/heads/main' && 'arn:aws:iam::ACCOUNT:role/ProdRole' || 'arn:aws:iam::ACCOUNT:role/DevRole' }}
+    aws-region: us-east-1
+```
+
+#### Session Tagging
+
+```yaml
+- uses: aws-actions/configure-aws-credentials@v1
+  with:
+    role-to-assume: arn:aws:iam::ACCOUNT:role/Role
+    aws-region: us-east-1
+    role-session-name: GitHubActions-${{ github.run_id }}
+    role-duration-seconds: 3600
+```
+
+#### CloudFront Invalidation
+
+```yaml
+- name: Invalidate CloudFront
+  run: |
+    aws cloudfront create-invalidation \
+      --distribution-id YOUR_DISTRIBUTION_ID \
+      --paths "/*"
+```
+
+## Key Features
+
+### 1. OIDC Authentication
+
+Eliminates long-lived credentials:
+
+```yaml
+permissions:
+  id-token: write      # Enable OIDC token generation
+  contents: read
+
+steps:
+  - uses: aws-actions/configure-aws-credentials@v1
+    with:
+      role-to-assume: arn:aws:iam::ACCOUNT:role/Role
+      aws-region: us-east-1
+```
+
+**Security Benefits**:
+- No AWS access keys in GitHub secrets
+- Automatic credential rotation
+- Temporary credentials (expire after job)
+- Audit trail via CloudTrail
+- Fine-grained access control
+
+### 2. Custom Composite Actions
+
+Reusable workflow components:
+
+```yaml
+- uses: ./.github/actions/cached-deps
+  with:
+    caching: 'true'
+```
+
+**Advantages**:
+- DRY (Don't Repeat Yourself)
+- Centralized maintenance
+- Consistent behavior across jobs
+- Easier testing and updates
+
+### 3. Docker-Based Actions
+
+Custom deployment logic in containers:
+
+```yaml
+# action.yml
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+```
+
+**Benefits**:
+- Isolated environment
+- Custom dependencies (AWS CLI, Python)
+- Reproducible across runs
+- Language-agnostic
+
+### 4. Conditional Artifact Upload
+
+Upload artifacts only when needed:
+
+```yaml
+- name: Upload test report
+  if: failure() && steps.run-tests.outcome == 'failure'
+  uses: actions/upload-artifact@v3
+```
+
+**Efficiency**:
+- Saves storage space
+- Reduces workflow time
+- Focused debugging
+
+### 5. Job Dependency Graph
+
+Complex workflow orchestration:
+
+```yaml
+lint:  # Independent
+test:  # Independent
+build:
+  needs: test     # Sequential
+deploy:
+  needs: build    # Sequential
+```
+
+### 6. Permission Scoping
+
+Minimal required permissions:
+
+```yaml
+deploy:
+  permissions:
+    id-token: write    # Only for OIDC
+    contents: read     # Only for checkout
+```
+
+**Security**:
+- Principle of least privilege
+- Prevents accidental modifications
+- Limits blast radius
+
+### 7. Artifact Sharing
+
+Build once, deploy multiple times:
+
+```yaml
+# Build job
+- uses: actions/upload-artifact@v3
+  with:
+    name: dist-files
+    path: dist
+
+# Deploy job
+- uses: actions/download-artifact@v3
+  with:
+    name: dist-files
+```
+
+## Troubleshooting
+
+### OIDC Token Generation Failure
+
+**Problem**: Error: "Unable to get ACTIONS_ID_TOKEN_REQUEST_URL".
+
+**Solutions**:
+
+1. **Check permissions**:
+   ```yaml
+   deploy:
+     permissions:
+       id-token: write  # Must be explicitly set
+       contents: read
+   ```
+
+2. **Verify organization settings**:
+   - Settings > Actions > General
+   - Ensure "Allow GitHub Actions to create and approve pull requests" is enabled
+
+3. **Check workflow file location**:
+   - Must be in `.github/workflows/` directory
+   - Must have `.yml` or `.yaml` extension
+
+### IAM Role Assumption Failure
+
+**Problem**: Error: "Not authorized to perform sts:AssumeRoleWithWebIdentity".
+
+**Solutions**:
+
+1. **Verify OIDC provider exists**:
+   ```bash
+   aws iam list-open-id-connect-providers
+   ```
+
+2. **Check trust policy**:
+   ```bash
+   aws iam get-role --role-name GitHubActionsRole
+   ```
+
+   Verify:
+   - Correct GitHub OIDC provider ARN
+   - Correct repository in `StringLike` condition
+   - Audience is `sts.amazonaws.com`
+
+3. **Validate repository format**:
+   ```json
+   "token.actions.githubusercontent.com:sub": "repo:USERNAME/REPO:*"
+   ```
+
+   Common mistakes:
+   - Missing `repo:` prefix
+   - Incorrect username/org
+   - Typo in repository name
+
+4. **Check if branch is restricted**:
+   ```json
+   # If using branch restriction
+   "token.actions.githubusercontent.com:sub": "repo:USER/REPO:ref:refs/heads/main"
+   ```
+
+### S3 Access Denied
+
+**Problem**: Error uploading to S3 bucket.
+
+**Solutions**:
+
+1. **Verify IAM policy**:
+   ```bash
+   aws iam get-role-policy \
+     --role-name GitHubActionsRole \
+     --policy-name S3DeploymentPolicy
+   ```
+
+2. **Check bucket name**:
+   - Ensure bucket exists
+   - Verify bucket name in workflow matches actual bucket
+   - Check region matches
+
+3. **Test permissions**:
+   ```yaml
+   - name: Test S3 access
+     run: |
+       aws s3 ls s3://your-bucket-name/
+       aws sts get-caller-identity
+   ```
+
+4. **Verify bucket policy**:
+   ```bash
+   aws s3api get-bucket-policy --bucket your-bucket-name
+   ```
+
+### Custom Action Not Found
+
+**Problem**: Error: "Unable to resolve action ./.github/actions/cached-deps".
+
+**Solutions**:
+
+1. **Verify directory structure**:
+   ```bash
+   ls -la .github/actions/cached-deps/
+   # Should contain action.yml
+   ```
+
+2. **Check action.yml exists**:
+   - File must be named `action.yml` or `action.yaml`
+   - Must be in correct directory
+
+3. **Ensure code is checked out**:
+   ```yaml
+   - uses: actions/checkout@v3  # Required before custom actions
+   - uses: ./.github/actions/cached-deps
+   ```
+
+4. **Verify action.yml syntax**:
+   ```yaml
+   name: 'Action Name'
+   description: 'Description'
+   runs:
+     using: 'composite'  # or 'docker'
+     # ...
+   ```
+
+### Docker Action Build Failures
+
+**Problem**: Custom Docker action fails to build.
+
+**Solutions**:
+
+1. **Check Dockerfile exists**:
+   ```bash
+   ls -la .github/actions/deploy-s3-docker/Dockerfile
+   ```
+
+2. **Test Docker build locally**:
+   ```bash
+   cd .github/actions/deploy-s3-docker/
+   docker build -t test .
+   ```
+
+3. **Verify all files are included**:
+   ```dockerfile
+   COPY deployment.py /deployment.py  # Ensure file exists
+   ```
+
+4. **Check base image availability**:
+   ```dockerfile
+   FROM python:3.9-slim  # Ensure image exists and is accessible
+   ```
+
+### Artifact Download Failures
+
+**Problem**: Build artifacts not available in deploy job.
+
+**Solutions**:
+
+1. **Verify artifact was uploaded**:
+   - Check build job logs
+   - Look for "Uploading artifact" message
+   - Verify in Actions > workflow run > Artifacts section
+
+2. **Check artifact name matches**:
+   ```yaml
+   # Upload
+   - uses: actions/upload-artifact@v3
+     with:
+       name: dist-files  # Name must match
+
+   # Download
+   - uses: actions/download-artifact@v3
+     with:
+       name: dist-files  # Exact match required
+   ```
+
+3. **Ensure build job completed**:
+   ```yaml
+   deploy:
+     needs: build  # Must wait for build
+   ```
+
+4. **Check artifact retention**:
+   - Artifacts expire after 90 days by default
+   - Check repository settings for retention policy
+
+### CloudFront Not Updating
+
+**Problem**: S3 updated but CloudFront shows old content.
+
+**Solutions**:
+
+1. **Add invalidation**:
+   ```yaml
+   - name: Invalidate CloudFront
+     run: |
+       aws cloudfront create-invalidation \
+         --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+         --paths "/*"
+   ```
+
+2. **Add CloudFront permissions to IAM role**:
+   ```json
+   {
+     "Effect": "Allow",
+     "Action": [
+       "cloudfront:CreateInvalidation"
+     ],
+     "Resource": "*"
+   }
+   ```
+
+3. **Wait for invalidation**:
+   ```bash
+   aws cloudfront wait invalidation-completed \
+     --distribution-id ID \
+     --id INVALIDATION_ID
+   ```
+
+### Website Not Accessible
+
+**Problem**: Files uploaded but website returns 404 or 403.
+
+**Solutions**:
+
+1. **Enable static website hosting**:
+   ```bash
+   aws s3 website s3://bucket-name \
+     --index-document index.html \
+     --error-document error.html
+   ```
+
+2. **Set bucket policy for public read**:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Sid": "PublicReadGetObject",
+       "Effect": "Allow",
+       "Principal": "*",
+       "Action": "s3:GetObject",
+       "Resource": "arn:aws:s3:::bucket-name/*"
+     }]
+   }
+   ```
+
+3. **Check file permissions**:
+   ```bash
+   aws s3api put-object-acl \
+     --bucket bucket-name \
+     --key index.html \
+     --acl public-read
+   ```
+
+4. **Verify website endpoint**:
+   ```bash
+   # Use website endpoint, not REST endpoint
+   # Correct: http://bucket.s3-website-region.amazonaws.com
+   # Wrong: https://bucket.s3.region.amazonaws.com
+   ```
+
+## Best Practices
+
+### 1. Use OIDC Instead of Access Keys
+
+```yaml
+# Good - OIDC
+- uses: aws-actions/configure-aws-credentials@v1
+  with:
+    role-to-assume: arn:aws:iam::ACCOUNT:role/Role
+
+# Avoid - Static credentials
+- uses: aws-actions/configure-aws-credentials@v1
+  with:
+    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+    aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+```
+
+### 2. Implement Least Privilege IAM Policies
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "s3:PutObject",
+    "s3:GetObject"
+  ],
+  "Resource": "arn:aws:s3:::specific-bucket/*"
+}
+```
+
+Not:
+```json
+{
+  "Effect": "Allow",
+  "Action": "s3:*",
+  "Resource": "*"
+}
+```
+
+### 3. Restrict OIDC to Specific Branches
+
+```json
+"Condition": {
+  "StringEquals": {
+    "token.actions.githubusercontent.com:sub": "repo:ORG/REPO:ref:refs/heads/main"
+  }
+}
+```
+
+### 4. Use Session Tagging
+
+```yaml
+- uses: aws-actions/configure-aws-credentials@v1
+  with:
+    role-to-assume: arn:aws:iam::ACCOUNT:role/Role
+    role-session-name: GitHub-${{ github.actor }}-${{ github.run_id }}
+```
+
+**Benefits**:
+- Better CloudTrail auditing
+- Identify who triggered deployment
+- Track deployment runs
+
+### 5. Set Appropriate Role Duration
+
+```yaml
+- uses: aws-actions/configure-aws-credentials@v1
+  with:
+    role-to-assume: arn:aws:iam::ACCOUNT:role/Role
+    role-duration-seconds: 3600  # 1 hour (adjust as needed)
+```
+
+### 6. Implement Multi-Environment Strategy
+
+```yaml
+deploy-staging:
+  environment: staging
+  if: github.ref == 'refs/heads/develop'
+
+deploy-production:
+  environment: production
+  if: github.ref == 'refs/heads/main'
+  needs: deploy-staging
+```
+
+### 7. Add CloudFormation/Terraform IaC
+
+Manage AWS resources as code:
+
+```yaml
+- name: Deploy infrastructure
+  run: |
+    terraform init
+    terraform apply -auto-approve
+```
+
+### 8. Enable S3 Versioning
+
+Protect against accidental deletion:
+
+```bash
+aws s3api put-bucket-versioning \
+  --bucket bucket-name \
+  --versioning-configuration Status=Enabled
+```
+
+### 9. Use CloudFront for Production
+
+```yaml
+- name: Deploy to S3
+  run: aws s3 sync dist/ s3://bucket/
+
+- name: Invalidate CloudFront
+  run: |
+    aws cloudfront create-invalidation \
+      --distribution-id ${{ secrets.DISTRIBUTION_ID }} \
+      --paths "/*"
+```
+
+### 10. Implement Deployment Validation
+
+```yaml
+- name: Validate deployment
+  run: |
+    STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://bucket.s3-website-region.amazonaws.com)
+    if [ $STATUS -ne 200 ]; then
+      echo "Deployment failed: HTTP $STATUS"
+      exit 1
+    fi
+```
+
+### 11. Add Rollback Capability
+
+```yaml
+- name: Deploy with rollback
+  run: |
+    # Backup current version
+    aws s3 sync s3://bucket/ s3://bucket-backup/
+
+    # Deploy new version
+    aws s3 sync dist/ s3://bucket/
+
+    # Validate
+    if ! curl -f http://bucket.s3-website-region.amazonaws.com; then
+      # Rollback
+      aws s3 sync s3://bucket-backup/ s3://bucket/
+      exit 1
+    fi
+```
+
+### 12. Monitor Costs
+
+Add cost estimation:
+
+```yaml
+- name: Estimate deployment costs
+  run: |
+    SIZE=$(du -sb dist/ | cut -f1)
+    echo "Deploying $SIZE bytes to S3"
+    # Add cost calculation logic
+```

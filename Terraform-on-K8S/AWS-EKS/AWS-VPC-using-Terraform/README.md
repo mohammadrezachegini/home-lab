@@ -178,12 +178,6 @@ All resources are tagged with:
 - Business Division
 - Subnet Type
 
-## Cost Optimization
-
-To reduce costs during development:
-- Use `vpc_single_nat_gateway = true` (only one NAT Gateway)
-- Deploy in fewer availability zones
-- Destroy resources when not in use
 
 ## Troubleshooting
 
