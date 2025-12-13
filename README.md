@@ -25,9 +25,14 @@ This repository showcases my hands-on experience with:
 - **Ansible** - Configuration management and automation
 
 ### CI/CD & DevOps Tools
+- **GitHub Actions** - Workflow automation and custom actions
 - **Jenkins** - Pipeline automation, multi-branch workflows
 - **GitLab CI/CD** - Automated testing and deployment
-- **GitHub Actions** - Workflow automation
+
+### Monitoring & Observability
+- **Prometheus** - Metrics collection and alerting
+- **Grafana** - Visualization and dashboards
+- **Alertmanager** - Alert routing and management
 
 ### Application Development
 - **Django** - REST API development
@@ -38,16 +43,19 @@ This repository showcases my hands-on experience with:
 
 ```
 home-lab/
+├── GitHubActions/              # CI/CD workflow automation
+├── K8S/
+│   └── K8S-Fundamentals/       # Core Kubernetes concepts
+├── Monitoring/
+│   └── Prometheus/             # Monitoring stack
 ├── AWS-EKS/                    # Amazon EKS implementations
 ├── Ansible/                    # Configuration management playbooks
 ├── CloudFormation/             # AWS infrastructure templates
 ├── Django/                     # Python web framework projects
 ├── Docker/                     # Containerization examples
-├── GitHubActions/              # CI/CD workflow automation
 ├── GitLab/                     # GitLab CI/CD pipelines
 ├── Java/                       # Java application deployments
 ├── Jenkins/                    # CI/CD pipeline configurations
-├── K8S-Fundamentals/           # Core Kubernetes concepts
 ├── NodeJS/                     # Node.js applications
 ├── Terraform-On-AWS/           # AWS infrastructure with Terraform
 ├── Terraform-On-GCP/           # GCP infrastructure with Terraform
@@ -57,19 +65,23 @@ home-lab/
 ## Featured Projects
 
 ### Kubernetes & Container Orchestration
-- **[EKS Cluster Management](terraform-on-k8s/AWS-EKS/)** - Production-grade EKS clusters with Terraform
-- **[Kubernetes Fundamentals](K8S-Fundamentals/)** - Core concepts including deployments, services, and storage
-- **[Ingress Controllers](terraform-on-k8s/AWS-EKS/EKS-Ingress-Cross-Namespaces/)** - Advanced networking and load balancing
-
-### Infrastructure as Code
-- **[Multi-Cloud Terraform](Terraform-On-AWS/)** - AWS infrastructure automation
-- **[GCP with Terraform](Terraform-On-GCP/)** - Google Cloud resource provisioning
-- **[Ansible Automation](Ansible/)** - Configuration management and server orchestration
+- **[Kubernetes Fundamentals](K8S/K8S-Fundamentals/)** - Core concepts including Pods, ReplicaSets, Deployments, and Services
+- **[EKS Cluster Management](AWS-EKS/)** - Production-grade EKS clusters
+- **[Mealie Application](K8S/K8S-Fundamentals/Mealie-deployments-app/)** - Real-world application deployment
 
 ### CI/CD Pipelines
+- **[GitHub Actions](GitHubActions/)** - Workflow automation with custom actions
 - **[Jenkins Pipelines](Jenkins/)** - Automated build and deployment workflows for Java, Node.js, Python, and PHP
 - **[GitLab CI/CD](GitLab/)** - Continuous integration and deployment automation
-- **[GitHub Actions](GitHubActions/)** - Workflow automation and testing
+
+### Infrastructure as Code
+- **[AWS with Terraform](Terraform-On-AWS/)** - AWS infrastructure automation
+- **[GCP with Terraform](Terraform-On-GCP/)** - Google Cloud resource provisioning
+- **[Kubernetes with Terraform](Terraform-on-K8S/)** - Kubernetes resources via Terraform
+- **[Ansible Automation](Ansible/)** - Configuration management and server orchestration
+
+### Monitoring & Observability
+- **[Prometheus Stack](Monitoring/Prometheus/)** - Complete monitoring setup with Prometheus, Grafana, and Alertmanager
 
 ### Application Development
 - **[Django REST APIs](Django/)** - Modern Python web applications
@@ -94,7 +106,7 @@ home-lab/
 - Troubleshooting distributed systems
 - Documentation and knowledge sharing
 - Version control with Git
-- Linux system administration
+- Linux system administration  
 
 ## Getting Started
 
@@ -125,4 +137,4 @@ I'm always eager to learn, collaborate, and discuss DevOps practices. If you're 
 **Note**: This is a living repository that grows as I learn new technologies and practices. Projects are continuously updated with improvements and new features.
 
 **Status**: Actively maintained and expanding
-**Last Updated**: October 2025
+**Last Updated**: December 2025
