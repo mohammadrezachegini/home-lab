@@ -1,0 +1,6 @@
+#tls_server_config:
+#  cert_file: prometheus.crt
+#  key_file: prometheus-private.key
+
+basic_auth_users:
+  admin: $2y$05$J/.Vz0QvdhPXROHUgRIinekG1rM9Am0.8yrLIgGtxzpJUjV3cvFFS

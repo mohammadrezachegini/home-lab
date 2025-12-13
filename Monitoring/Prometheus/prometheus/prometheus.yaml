@@ -1,0 +1,82 @@
+# my global config
+global:
+  scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+ - "rules/alerts.yml"
+ - "rules/recording_rule.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]
+       # The label name is added as a label `label_name=<label_value>` to any timeseries scraped from this config.
+        labels:
+          app: "prometheus"
+
+  - job_name: "pyhton-app"
+    static_configs:
+      - targets: ["localhost:8000"]
+
+
+  - job_name: "node_exporter_ubuntu_vm"
+    static_configs:
+      - targets: ["10.0.0.39:9100"]
+
+
+  - job_name: "node_exporter_fedora_vm"
+    static_configs:
+      - targets: ["10.0.0.108:9300"]
+
+
+
+  - job_name: "node_exporter_ubuntu_home_lab"
+    static_configs:
+      - targets: ["10.0.0.126:9200"]
+
+
+  - job_name: "node_exporter_macos"
+    static_configs:
+      - targets: ["10.0.0.155:9400"]
+
+  - job_name: "files_sd"
+    file_sd_configs:
+      - files:
+        - /etc/prometheus/files_sd/*.yml
+
+#    - job_name: "aws_sd"
+#    ec2_sd_configs:
+#      - port: 9090
+#        region: us-east-1
+#        access_key = ''
+#        secret_key = ''
+#        filters:
+#          - name: tag:Name
+#            values:
+#              - dev-.*
+#    relable_configs:
+#      - source_labels: [__meta_ec2_tag_Name, __meta-ec2_private_ip]
+#        target_labels: instance
+#      - source_labels: [__meta_ec2_tag_name]
+#        regex: dev-.*
+#        action: drop #keep
+#      - source_labels: [__meta_ec2_public_ip]
+#        replacement: ${1}:9090 # we have only one item in bracket and it start from 1
+#        target_label: __address__

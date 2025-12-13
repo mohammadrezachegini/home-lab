@@ -1,0 +1,9 @@
+- targets:
+  - localhost:9100
+  labels:
+    team: "Team Reza1"
+
+- targets:
+  - localhost:9200
+  labels:
+    team: "Team Reza2"

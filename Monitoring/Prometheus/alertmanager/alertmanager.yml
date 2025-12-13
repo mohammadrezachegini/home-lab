@@ -1,0 +1,49 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587' # Change to your SMTP server and port
+  smtp_from: 'yourname@gmail.com' # Change @gmail.com to your email address
+  smtp_auth_username: 'yourname@gmail.com' # Change @gmail.com to your email address
+  smtp_auth_password: 'your-app-specific-password'
+  smtp_require_tls: true #disable if you don't want to use TLS e.g., for local testing
+
+route:
+  #receiver: 'main_receiver'
+  receiver: 'pager_duty'
+  routes:
+  - receiver: 'urgent_receiver'
+    matchers:
+    - severity="Critical"
+
+receivers:
+- name: 'main_receiver'
+  email_configs:
+  - to: 'yourname@gmail.com' # Change to your receiver email address
+    send_resolved: true
+
+- name: 'urgent_receiver'
+  email_configs:
+  - to: 'yourname@gmail.com' # Change to your receiver email address
+    send_resolved: true
+    headers:
+      subject: 'Urgent: Critical Alert'
+
+
+name: 'slack_reciever'
+slack_configs:
+- api_url: ''
+  channel: '#channelname'
+
+
+
+name: 'pager_duty'
+pagerduty_configss:
+- service_key: ''
+
+
+inhibit_rules:
+- source_match:
+    team: "Team reza"
+  target_match:
+    team: "Team reza2"
+  equal: ['severity']
+      
+

@@ -1,0 +1,22 @@
+groups:
+  - name: Alerts
+    rules:
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter_fedora_vm"} == 0
+        for: 0m
+        labels:
+          team: team reza
+          severity: critical
+        annotations:
+          summary: "{{$ label.instance}} is down"
+          description: "team reza has to restart the server {{$labels}} VALUE: {{$value}}"
+
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter_fedora_vm"} == 0
+        for: 0m
+        labels:
+          team: team reza2
+          severity: critical
+        annotations:
+          summary: "{{$ label.instance}} is down"
+          description: "team reza has to restart the server {{$labels}} VALUE: {{$value}}"

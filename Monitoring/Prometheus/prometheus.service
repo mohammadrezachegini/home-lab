@@ -1,0 +1,23 @@
+[Unit]
+Description=Prometheus Service
+Documentation=https://prometheus.io/docs/introduction/overview/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=prometheus
+Group=prometheus
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yaml \
+  --storage.tsdb.path=/var/lib/prometheus \
+  --web.config.file=/etc/prometheus/web.yml \
+  --web.listen-address=0.0.0.0:9090
+SyslogIdentifier=prometheus
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
