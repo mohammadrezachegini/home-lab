@@ -1,0 +1,148 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: Build
+    displayName: Build
+    steps:
+    - task: NuGetToolInstaller@1
+
+    - task: NuGetCommand@2
+      inputs:
+        restoreSolution: '$(solution)'
+
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: build
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: publish
+        publishWebProjects: True
+        arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: True
+
+    # We still need to take the staging directory files and publish it as a build artifact
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'sqlapp-secure-artifact'
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)/sqlapp/Templates'
+        artifactName: 'template-artifact'
+
+- stage: Deploy
+  displayName: Deployment stage
+  jobs:
+  - job: Deploy
+    displayName: Deploy
+    steps:
+
+    - download: current
+      artifact: sqlapp-secure-artifact
+
+    - task: AzureCLI@2
+      displayName: 'Azure CLI - Azure Web App'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        scriptType: ps
+        scriptLocation: inlineScript
+        inlineScript: |
+          az appservice plan create -g template-grp -n plan787878 --sku F1 --l "North Europe"
+
+          az webapp create -g template-grp -p plan787878 -n newapp3094848 --runtime "dotnet:6"
+
+    - task: AzureCLI@2
+      displayName: 'Azure CLI - Azure SQL Database'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        scriptType: ps
+        scriptLocation: inlineScript
+        inlineScript: |
+          az sql server create --name sqlserver4205058 --resource-group template-grp --location "North Europe" --admin-user sqlusr --admin-password Azure@123
+
+          az sql db create --resource-group template-grp --server sqlserver4205058 --name appdb --service-objective "Basic"
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: 'Azure SQL Table creation'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        ServerName: sqlserver4205058.database.windows.net
+        DatabaseName: appdb
+        SqlUsername: sqlusr
+        SqlPassword: 'Azure@123'
+        deployType: InlineSqlTask
+        SqlInline: |
+          IF (NOT EXISTS (SELECT * 
+                       FROM INFORMATION_SCHEMA.TABLES 
+                       WHERE TABLE_SCHEMA = 'dbo' 
+                       AND  TABLE_NAME = 'Products'))
+          BEGIN
+
+          CREATE TABLE Products
+          (
+           ProductID int,
+           ProductName varchar(1000),
+           Quantity int
+          )
+
+          INSERT INTO Products(ProductID,ProductName,Quantity) VALUES (1,'Mobile',100)
+
+          INSERT INTO Products(ProductID,ProductName,Quantity) VALUES (2,'Laptop',200)
+
+          INSERT INTO Products(ProductID,ProductName,Quantity) VALUES (3,'Tabs',300)
+
+          END
+        IpDetectionMethod: IPAddressRange
+        StartIpAddress: 0.0.0.0
+        EndIpAddress: 0.0.0.0
+        DeleteFirewallRule: false
+
+    - task: AzureWebApp@1
+      displayName: 'Azure Web App Deploy: newapp3094848'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        appType: webApp
+        appName: newapp3094848
+        Package: '$(Pipeline.Workspace)/sqlapp-secure-artifact/**/*.zip'
+
+    - task: AzureAppServiceSettings@1
+      displayName: 'Azure App Service Settings: newapp3094848'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        appName: newapp3094848
+        resourceGroupName: 'template-grp'
+        connectionStrings: |
+          [
+            {
+              "name": "SQLConnection",
+              "value": "Server=tcp:sqlserver4205058.database.windows.net,1433;Initial Catalog=appdb;Persist Security Info=False;User ID=sqlusr;Password=Azure@123;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;",
+              "type": "SQLAzure",
+              "slotSetting": false
+            }
+          ]
