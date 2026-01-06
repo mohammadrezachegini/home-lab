@@ -1,0 +1,63 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "functions": [],
+    "variables": {
+        "web-app-name":"[concat('webapp',uniqueString(resourceGroup().id))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2022-03-01",
+            "name": "plan787878",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name":"F1",
+                "capacity":1
+            },
+            "properties":{
+                "name":"plan787878"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2022-03-01",
+            "name": "[variables('web-app-name')]",
+            "location": "[resourceGroup().location]",
+            "properties":{
+                "name":"[variables('web-app-name')]",
+                "serverFarmId":"[resourceId('Microsoft.Web/serverfarms','plan787878')]"
+            },
+            "dependsOn":[
+                "[resourceId('Microsoft.Web/serverfarms','plan787878')]"
+            ]
+        },
+        {
+            "type":"Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name":"LinkedTemplate",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "https://templatestore465656.blob.core.windows.net/templates/sqldatabase.json",
+                    "contentVersion":"1.0.0.0"
+                },
+                "parametersLink": {
+                    "uri": "https://templatestore465656.blob.core.windows.net/templates/sqldatabase-parameters.json",
+                    "contentVersion":"1.0.0.0"
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "webappname": {
+            "type": "string",
+            "value":"[variables('web-app-name')]"
+        },
+        "sqlserverfqdn": {
+            "type": "string",
+            "value":"[reference('LinkedTemplate').outputs.sqlserverfqdn.value]"
+        }
+    }
+}

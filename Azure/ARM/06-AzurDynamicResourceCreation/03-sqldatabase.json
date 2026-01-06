@@ -1,0 +1,56 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "SQLLogin": {
+            "type":"string",
+            "metadata":{
+                "description":"The administrator user name"
+            }
+        },
+        "SQLPassword": {
+            "type":"secureString",
+            "metadata":{
+                "description":"The administrator password"
+            }
+
+        }
+    },
+    "functions": [],
+    "variables": {
+        "sql-server-name":"[concat('server',uniqueString(resourceGroup().id))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2022-02-01-preview",
+            "name": "[variables('sql-server-name')]",
+            "location": "[resourceGroup().location]",
+            "properties":{
+                "administratorLogin": "[parameters('SQLLogin')]",
+                "administratorLoginPassword": "[parameters('SQLPassword')]"
+            }
+        },
+        {
+               "type": "Microsoft.Sql/servers/databases",
+               "apiVersion": "2022-02-01-preview",
+               "name": "[format('{0}/{1}',variables('sql-server-name'),'appdb')]",
+               "location": "[resourceGroup().location]",
+               "sku":{
+                "name":"Basic",
+                "tier":"Basic"
+               },
+               "properties":{},
+                "dependsOn":[
+                    "[resourceId('Microsoft.Sql/servers',variables('sql-server-name'))]"
+                ]
+               
+        }
+    ],
+    "outputs": {
+        "sqlserverfqdn": {
+            "type": "string",
+            "value":"[reference(variables('sql-server-name')).fullyQualifiedDomainName]"
+        }
+    }
+}
