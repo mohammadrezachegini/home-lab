@@ -1,0 +1,143 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- main
+
+pool:
+  vmImage: 'windows-latest'
+
+resources:
+- repo: self
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: Build
+    displayName: Build
+    steps:
+    - task: NuGetToolInstaller@1
+
+    - task: NuGetCommand@2
+      inputs:
+        restoreSolution: '$(solution)'
+
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: build
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: publish
+        publishWebProjects: True
+        arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: True
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'sqlapp-artifact'
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)/sqlapp/Templates'
+        artifactName: 'template-artifact'
+
+- stage: Deploy
+  displayName: Deployment stage
+  jobs:
+  - job: Deploy
+    displayName: Deploy
+    steps:
+
+    - download: current
+      artifact: sqlapp-artifact
+
+    - download: current
+      artifact: template-artifact
+
+    - pwsh: |
+        Get-ChildItem -Path $(Pipeline.Workspace)\*.* -Recurse -Force | Out-String -Width 180
+      errorActionPreference: continue
+      displayName: 'List content'
+      continueOnError: true
+
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: 'ARM Template deployment: Resource Group scope'
+      inputs:
+        azureResourceManagerConnection: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        subscriptionId: '6912d7a0-bc28-459a-9407-33bbba641c07'
+        resourceGroupName: 'template-grp'
+        location: 'North Europe'
+        csmFile: '$(Pipeline.Workspace)/template-artifact/main.json'
+        action: 'Create Or Update Resource Group'
+        deploymentMode: 'Incremental'
+
+    - task: SqlAzureDacpacDeployment@1
+      displayName: 'Azure SQL InlineSqlTask'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        ServerName: sqlserver8000505.database.windows.net
+        DatabaseName: appdb
+        SqlUsername: sqlusr
+        SqlPassword: 'Azure@123'
+        deployType: InlineSqlTask
+        SqlInline: |
+          IF (NOT EXISTS (SELECT * 
+                       FROM INFORMATION_SCHEMA.TABLES 
+                       WHERE TABLE_SCHEMA = 'dbo' 
+                       AND  TABLE_NAME = 'Products'))
+          BEGIN
+
+          CREATE TABLE Products
+          (
+           ProductID int,
+           ProductName varchar(1000),
+           Quantity int
+           )
+
+
+           INSERT INTO Products(ProductID,ProductName,Quantity) VALUES (1,'Mobile',100)
+
+           INSERT INTO Products(ProductID,ProductName,Quantity) VALUES (2,'Laptop',200)
+
+           INSERT INTO Products(ProductID,ProductName,Quantity) VALUES (3,'Tabs',300)
+
+           END
+        IpDetectionMethod: IPAddressRange
+        StartIpAddress: 0.0.0.0
+        EndIpAddress: 0.0.0.0
+        DeleteFirewallRule: false
+    - task: AzureRmWebAppDeployment@4
+      displayName: 'Azure App Service Deploy'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        WebAppName: newapp1094848
+        Package: '$(Pipeline.Workspace)/sqlapp-artifact/**/*.zip'
+
+    - task: AzureAppServiceSettings@1
+      displayName: 'Azure App Service Settings: newapp1094848'
+      inputs:
+        azureSubscription: 'Azure subscription 1 (6912d7a0-bc28-459a-9407-33bbba641c07)'
+        appName: newapp1094848
+        resourceGroupName: 'template-grp'
+        connectionStrings: |
+          [
+            {
+              "name": "SQLConnection",
+              "value": "Server=tcp:sqlserver8000505.database.windows.net,1433;Initial Catalog=appdb;Persist Security Info=False;User ID=sqlusr;Password=Azure@123;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;",
+              "type": "SQLAzure",
+              "slotSetting": false
+            }
+          ]
