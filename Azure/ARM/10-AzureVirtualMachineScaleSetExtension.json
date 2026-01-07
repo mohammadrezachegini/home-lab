@@ -1,0 +1,205 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "resources": [
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2021-05-01",
+            "name": "app-balancer",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', 'app-ip')]"
+            ],
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'app-ip')]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "app-pool"
+                    }
+                ],
+                "loadBalancingRules": [
+                    {
+                        "name": "RuleA",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations', 'app-balancer', 'loadBalancerFrontEnd')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', 'app-balancer', 'app-pool')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 80,
+                            "backendPort": 80,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[resourceId('Microsoft.Network/loadBalancers/probes', 'app-balancer', 'tcpProbe')]"
+                            }
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "tcpProbe",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "port": 80,
+                            "intervalInSeconds": 5,
+                            "numberOfProbes": 2
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachineScaleSets",
+            "apiVersion": "2021-11-01",
+            "name": "app-set",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', 'app-network')]",
+                "[resourceId('Microsoft.Network/loadBalancers', 'app-balancer')]"
+            ],
+            "sku": {
+                "name": "Standard_D2s_v3",
+                "tier": "Standard",
+                "capacity": 2
+            },
+            "properties": {
+                "overprovision": true,
+                "upgradePolicy": {
+                    "mode": "Automatic"
+                },
+                "singlePlacementGroup": true,
+                "platformFaultDomainCount": 3,
+                "virtualMachineProfile": {
+                    "storageProfile": {
+                        "osDisk": {
+                            "caching": "ReadWrite",
+                            "createOption": "FromImage"
+                        },
+                        "imageReference": {
+                            "publisher": "MicrosoftWindowsServer",
+                            "offer": "WindowsServer",
+                            "sku": "2019-Datacenter",
+                            "version": "latest"
+                        }
+                    },
+                    "osProfile": {
+                        "computerNamePrefix": "appvm",
+                        "adminUsername": "demousr",
+                        "adminPassword": ""
+                    },
+                    "extensionProfile": {
+                        "extensions": [
+                            {
+                                "type": "Microsoft.Compute/virtualMachineScaleSets/extensions",
+                                "name": "TeamServicesAgent",
+                                "location": "[resourceGroup().location]",
+                                "properties": {
+                                    "publisher": "Microsoft.VisualStudio.Services",
+                                    "type": "TeamServicesAgent",
+                                    "typeHandlerVersion": "1.0",
+                                    "autoUpgradeMinorVersion": true,
+                                    "settings": {
+                                        "VSTSAccountName": "techsup4000",
+                                        "TeamProject": "AgileProject",
+                                        "DeploymentGroup": "Agile-Deployment"
+                                    },
+                                    "protectedSettings": {
+                                        "PATToken": ""
+                                    }
+                                }
+                            },
+                            {
+                                "type": "Microsoft.Compute/virtualMachineScaleSets/extensions",
+                                "name": "config-app",
+                                "location": "[resourceGroup().location]",
+                                "properties": {
+                                    "publisher": "Microsoft.Compute",
+                                    "type": "CustomScriptExtension",
+                                    "typeHandlerVersion": "1.10",
+                                    "autoUpgradeMinorVersion": true,
+                                    "settings": {
+                                        "fileUris": [
+                                            "https://templatestore465656.blob.core.windows.net/installers/script.ps1?sp=r&st=2022-08-17T04:34:28Z&se=2022-08-17T12:34:28Z&spr=https&sv=2021-06-08&sr=b&sig=7OjFWfdeaEg8hzGyfD7BwMzd6CVwXvvcoIlzPfsiMnE%3D"
+                                        ],
+                                        "commandToExecute": "powershell -ExecutionPolicy Unrestricted -File script.ps1"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "networkProfile": {
+                        "networkInterfaceConfigurations": [
+                            {
+                                "name": "app-nic",
+                                "properties": {
+                                    "primary": true,
+                                    "ipConfigurations": [
+                                        {
+                                            "name": "ipConfig",
+                                            "properties": {
+                                                "subnet": {
+                                                    "id": "[reference(resourceId('Microsoft.Network/virtualNetworks', 'app-network')).subnets[0].id]"
+                                                },
+                                                "loadBalancerBackendAddressPools": [
+                                                    {
+                                                        "id": "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', 'app-balancer', 'app-pool')]"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2021-05-01",
+            "name": "app-network",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/16"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "SubnetA",
+                        "properties": {
+                            "addressPrefix": "10.0.0.0/24"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2021-05-01",
+            "name": "app-ip",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "app-set"
+                }
+            }
+        }
+    ]
+}
