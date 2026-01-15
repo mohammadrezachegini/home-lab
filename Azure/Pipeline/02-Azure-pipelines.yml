@@ -1,0 +1,122 @@
+trigger:
+- master
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+
+  iisSiteName: 'Default Web Site'
+  iisAppName: 'MyApp'
+  iisAppPhysicalPath: 'C:\inetpub\MyApp'
+
+stages:
+# =========================
+# CI: Build + Test + Package
+# =========================
+- stage: Build
+  displayName: "CI - Build & Test"
+  jobs:
+  - job: BuildJob
+    displayName: "Build"
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+    - task: NuGetToolInstaller@1
+
+    - task: NuGetCommand@2
+      inputs:
+        restoreSolution: '$(solution)'
+
+    - task: VSBuild@1
+      inputs:
+        solution: '$(solution)'
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
+        msbuildArgs: >
+          /p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(Build.ArtifactStagingDirectory)\WebApp.zip"
+
+    - task: VSTest@2
+      inputs:
+        platform: '$(buildPlatform)'
+        configuration: '$(buildConfiguration)'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+# =========================
+# CD: Deploy to IIS (RUNS ON YOUR VM RESOURCE)
+# =========================
+- stage: Deploy
+  displayName: "CD - Deploy to IIS"
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployToIIS
+    displayName: "Deploy to IIS VM"
+    environment:
+      name: production
+      resourceName: reza # <-- THIS MUST MATCH the Environment resource name
+      resourceType: VirtualMachine
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: PowerShell@2
+            displayName: "DEBUG: confirm target machine"
+            inputs:
+              targetType: inline
+              script: |
+                hostname
+                whoami
+                Import-Module WebAdministration
+                Get-Website | Select Name, State, PhysicalPath
+                dir C:\inetpub\wwwroot | Select Name
+
+          - task: PowerShell@2
+            displayName: "Ensure IIS App exists"
+            inputs:
+              targetType: inline
+              script: |
+                Import-Module WebAdministration
+
+                $siteName = "$(iisSiteName)"
+                $appName  = "$(iisAppName)"
+                $path     = "$(iisAppPhysicalPath)"
+
+                if (!(Test-Path $path)) { New-Item -ItemType Directory -Path $path -Force | Out-Null }
+
+                $site = Get-Website -Name $siteName -ErrorAction SilentlyContinue
+                if (-not $site) { throw "IIS site '$siteName' does not exist on this machine." }
+
+                $existingApp = Get-WebApplication -Site $siteName -Name $appName -ErrorAction SilentlyContinue
+                if (-not $existingApp) {
+                  New-WebApplication -Site $siteName -Name $appName -PhysicalPath $path
+                  Write-Host "Created IIS app: $siteName/$appName -> $path"
+                } else {
+                  Write-Host "IIS app already exists: $siteName/$appName"
+                }
+
+          - task: IISWebAppDeploymentOnMachineGroup@0
+            displayName: "Deploy package to IIS"
+            inputs:
+              WebSiteName: '$(iisSiteName)/$(iisAppName)'
+              Package: '$(Pipeline.Workspace)\drop\WebApp.zip'
+              TakeAppOfflineFlag: true
+              RemoveAdditionalFilesFlag: true
+              XmlTransformation: true
+              XmlVariableSubstitution: true
+
+          - task: PowerShell@2
+            displayName: "Verify on VM"
+            inputs:
+              targetType: inline
+              script: |
+                dir "$(iisAppPhysicalPath)" | Select Name
+                curl -i "http://localhost/$(iisAppName)/"
