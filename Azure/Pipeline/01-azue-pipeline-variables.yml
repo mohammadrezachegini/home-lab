@@ -1,0 +1,22 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  databaseServerName: server4000
+
+steps:
+- script: |
+    echo $(databaseServerName)
+- bash: echo "##vso[task.setvariable variable=databaseServerName]server5000"
+- script: |
+    echo $(databaseServerName)
+- script: |
+    echo ${{variables.databaseServerName}}
