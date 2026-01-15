@@ -1,0 +1,171 @@
+# Python Django - Multi-Stage Pipeline with Build and Release
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  pythonVersion: '3.10'
+
+stages:
+# Build Stage
+- stage: Build
+  displayName: 'Build and Test'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build Django Application'
+    strategy:
+      matrix:
+        Python38:
+          PYTHON_VERSION: '3.8'
+        Python39:
+          PYTHON_VERSION: '3.9'
+        Python310:
+          PYTHON_VERSION: '3.10'
+      maxParallel: 3
+
+    steps:
+    - task: UsePythonVersion@0
+      displayName: 'Use Python $(PYTHON_VERSION)'
+      inputs:
+        versionSpec: '$(PYTHON_VERSION)'
+        architecture: 'x64'
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Install dependencies'
+
+    - script: |
+        python manage.py test
+      displayName: 'Run Django tests'
+
+    - task: PublishTestResults@2
+      displayName: 'Publish test results'
+      inputs:
+        testResultsFiles: '**/TEST-*.xml'
+        testRunTitle: 'Python $(PYTHON_VERSION)'
+      condition: succeededOrFailed()
+
+    # Only create artifact from Python 3.10 build
+    - task: ArchiveFiles@2
+      displayName: 'Archive application files'
+      condition: and(succeeded(), eq(variables['PYTHON_VERSION'], '3.10'))
+      inputs:
+        rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/django-app-$(Build.BuildId).zip'
+        replaceExistingArchive: true
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish build artifact'
+      condition: and(succeeded(), eq(variables['PYTHON_VERSION'], '3.10'))
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+# Deploy to Development
+- stage: DeployDev
+  displayName: 'Deploy to Development'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployDevJob
+    displayName: 'Deploy to Dev Environment'
+    environment: 'development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@1
+            displayName: 'Download build artifacts'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: ExtractFiles@1
+            displayName: 'Extract application files'
+            inputs:
+              archiveFilePatterns: '$(System.ArtifactsDirectory)/drop/*.zip'
+              destinationFolder: '$(Pipeline.Workspace)/app'
+              cleanDestinationFolder: true
+
+          - script: |
+              echo "Deploying to Development environment..."
+              ls -la $(Pipeline.Workspace)/app
+              # Add your deployment commands here
+              # Example: scp, rsync, Azure Web App deploy, etc.
+            displayName: 'Deploy application to Dev'
+
+# Deploy to Staging
+- stage: DeployStaging
+  displayName: 'Deploy to Staging'
+  dependsOn: DeployDev
+  condition: succeeded()
+  jobs:
+  - deployment: DeployStagingJob
+    displayName: 'Deploy to Staging Environment'
+    environment: 'staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@1
+            displayName: 'Download build artifacts'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: ExtractFiles@1
+            displayName: 'Extract application files'
+            inputs:
+              archiveFilePatterns: '$(System.ArtifactsDirectory)/drop/*.zip'
+              destinationFolder: '$(Pipeline.Workspace)/app'
+              cleanDestinationFolder: true
+
+          - script: |
+              echo "Deploying to Staging environment..."
+              ls -la $(Pipeline.Workspace)/app
+            displayName: 'Deploy application to Staging'
+
+# Deploy to Production
+- stage: DeployProduction
+  displayName: 'Deploy to Production'
+  dependsOn: DeployStaging
+  condition: succeeded()
+  jobs:
+  - deployment: DeployProdJob
+    displayName: 'Deploy to Production Environment'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@1
+            displayName: 'Download build artifacts'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: ExtractFiles@1
+            displayName: 'Extract application files'
+            inputs:
+              archiveFilePatterns: '$(System.ArtifactsDirectory)/drop/*.zip'
+              destinationFolder: '$(Pipeline.Workspace)/app'
+              cleanDestinationFolder: true
+
+          - script: |
+              echo "Deploying to Production environment..."
+              ls -la $(Pipeline.Workspace)/app
+              # Add production deployment commands
+            displayName: 'Deploy application to Production'
