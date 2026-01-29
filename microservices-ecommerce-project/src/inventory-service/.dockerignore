@@ -11,4 +11,4 @@ docker-compose.yml
 .vscode
 .idea
 .DS_Store
-*.md
+*md
