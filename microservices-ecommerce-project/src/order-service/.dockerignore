@@ -1,0 +1,15 @@
+.env
+.env.local
+.git
+.gitignore
+README.md
+.dockerignore
+Dockerfile
+docker-compose.yml
+.vscode
+.idea
+*.md
+.DS_Store
+main
+*.test
+*.out
