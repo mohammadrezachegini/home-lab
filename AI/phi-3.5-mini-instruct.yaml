@@ -1,0 +1,15 @@
+name: phi-3.5-mini-instruct
+parameters:
+  model: bartowski/phi-3.5-mini-instruct.gguf
+  type: phi-3.5-mini-instruct
+  format: gguf
+
+backend: llama-cpp
+context_size: 8192
+gpu_layers: 0
+threads: 4
+batch_size: 64
+f16: true
+download_files:
+- url: https://huggingface.co/bartowski/phi-3.5-mini-instruct-GGUF/resolve/main/phi-3.5-mini-instruct-Q6_K.gguf
+  filename: bartowski/phi-3.5-mini-instruct.gguf
