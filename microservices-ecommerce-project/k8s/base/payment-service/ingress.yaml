@@ -12,7 +12,7 @@ spec:
   - http:
       paths:
       - path: /payments(/|$)(.*)
-        pathType: Prefix
+        pathType: ImplementationSpecific
         backend:
           service:
             name: payment-service

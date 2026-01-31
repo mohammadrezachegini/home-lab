@@ -12,7 +12,7 @@ spec:
   - http:
       paths:
       - path: /inventory(/|$)(.*)
-        pathType: Prefix
+        pathType: ImplementationSpecific
         backend:
           service:
             name: inventory-service

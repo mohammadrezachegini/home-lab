@@ -12,7 +12,7 @@ spec:
   - http:
       paths:
       - path: /products(/|$)(.*)
-        pathType: Prefix
+        pathType: ImplementationSpecific
         backend:
           service:
             name: product-service
