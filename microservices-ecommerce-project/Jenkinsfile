@@ -1,31 +1,5 @@
 pipeline {
-    agent {
-        kubernetes {
-            yaml '''
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-  - name: docker
-    image: docker:latest
-    command:
-    - cat
-    tty: true
-    volumeMounts:
-    - name: docker-sock
-      mountPath: /var/run/docker.sock
-  - name: kubectl
-    image: bitnami/kubectl:latest
-    command:
-    - cat
-    tty: true
-  volumes:
-  - name: docker-sock
-    hostPath:
-      path: /var/run/docker.sock
-'''
-        }
-    }
+    agent any  // Use built-in executors instead of Kubernetes pods
     
     environment {
         DOCKER_REGISTRY = 'docker.io'
@@ -42,151 +16,66 @@ spec:
         }
         
         stage('Test') {
-            parallel {
-                stage('Test Product Service') {
-                    steps {
-                        echo '🧪 Testing Product Service...'
-                        sh '''
-                            echo "Running product-service tests"
-                            # Add actual tests here
-                        '''
-                    }
-                }
-                stage('Test User Service') {
-                    steps {
-                        echo '🧪 Testing User Service...'
-                        sh '''
-                            echo "Running user-service tests"
-                            # Add actual tests here
-                        '''
-                    }
-                }
-                stage('Test Order Service') {
-                    steps {
-                        echo '🧪 Testing Order Service...'
-                        sh '''
-                            echo "Running order-service tests"
-                            # Add actual tests here
-                        '''
-                    }
-                }
-                stage('Test Payment Service') {
-                    steps {
-                        echo '🧪 Testing Payment Service...'
-                        sh '''
-                            echo "Running payment-service tests"
-                            # Add actual tests here
-                        '''
-                    }
-                }
-                stage('Test Inventory Service') {
-                    steps {
-                        echo '🧪 Testing Inventory Service...'
-                        sh '''
-                            echo "Running inventory-service tests"
-                            # Add actual tests here
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Build') {
-            parallel {
-                stage('Build Product Service') {
-                    steps {
-                        container('docker') {
-                            echo '🏗️ Building Product Service...'
-                            sh '''
-                                cd src/product-service
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG} .
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:latest .
-                            '''
-                        }
-                    }
-                }
-                stage('Build User Service') {
-                    steps {
-                        container('docker') {
-                            echo '🏗️ Building User Service...'
-                            sh '''
-                                cd src/user-service
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG} .
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:latest .
-                            '''
-                        }
-                    }
-                }
-                stage('Build Order Service') {
-                    steps {
-                        container('docker') {
-                            echo '🏗️ Building Order Service...'
-                            sh '''
-                                cd src/order-service
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG} .
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:latest .
-                            '''
-                        }
-                    }
-                }
-                stage('Build Payment Service') {
-                    steps {
-                        container('docker') {
-                            echo '🏗️ Building Payment Service...'
-                            sh '''
-                                cd src/payment-service
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG} .
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:latest .
-                            '''
-                        }
-                    }
-                }
-                stage('Build Inventory Service') {
-                    steps {
-                        container('docker') {
-                            echo '🏗️ Building Inventory Service...'
-                            sh '''
-                                cd src/inventory-service
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG} .
-                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:latest .
-                            '''
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Push') {
             steps {
-                container('docker') {
-                    echo '📤 Pushing images to registry...'
-                    sh '''
-                        echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin
-                        
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:latest
-                        
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:latest
-                        
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:latest
-                        
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:latest
-                        
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:latest
-                    '''
+                echo '🧪 Running tests...'
+                script {
+                    // Test each service
+                    def services = ['product-service', 'user-service', 'order-service', 'payment-service', 'inventory-service']
+                    services.each { service ->
+                        echo "Testing ${service}..."
+                        // Add actual test commands here based on language
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Images') {
+            steps {
+                echo '🏗️ Building Docker images...'
+                script {
+                    def services = [
+                        'product-service',
+                        'user-service', 
+                        'order-service',
+                        'payment-service',
+                        'inventory-service'
+                    ]
+                    
+                    services.each { service ->
+                        echo "Building ${service}..."
+                        sh """
+                            cd src/${service}
+                            docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:${IMAGE_TAG} .
+                            docker tag ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:${IMAGE_TAG} \
+                                       ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:latest
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Push to Registry') {
+            steps {
+                echo '📤 Pushing images to Docker Hub...'
+                script {
+                    sh "echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin"
+                    
+                    def services = ['product-service', 'user-service', 'order-service', 'payment-service', 'inventory-service']
+                    services.each { service ->
+                        sh """
+                            docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:${IMAGE_TAG}
+                            docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:latest
+                        """
+                    }
                 }
             }
         }
         
         stage('Deploy to Kubernetes') {
             steps {
-                container('kubectl') {
-                    echo '🚀 Deploying to Kubernetes...'
-                    sh '''
+                echo '🚀 Deploying to Kubernetes...'
+                script {
+                    sh """
                         kubectl set image deployment/product-service \
                             product-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG} \
                             -n ecommerce
@@ -206,23 +95,21 @@ spec:
                         kubectl set image deployment/inventory-service \
                             inventory-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG} \
                             -n ecommerce
-                    '''
+                    """
                 }
             }
         }
         
         stage('Verify Deployment') {
             steps {
-                container('kubectl') {
-                    echo '✅ Verifying deployment...'
-                    sh '''
-                        kubectl rollout status deployment/product-service -n ecommerce
-                        kubectl rollout status deployment/user-service -n ecommerce
-                        kubectl rollout status deployment/order-service -n ecommerce
-                        kubectl rollout status deployment/payment-service -n ecommerce
-                        kubectl rollout status deployment/inventory-service -n ecommerce
-                    '''
-                }
+                echo '✅ Verifying deployment...'
+                sh """
+                    kubectl rollout status deployment/product-service -n ecommerce --timeout=5m
+                    kubectl rollout status deployment/user-service -n ecommerce --timeout=5m
+                    kubectl rollout status deployment/order-service -n ecommerce --timeout=5m
+                    kubectl rollout status deployment/payment-service -n ecommerce --timeout=5m
+                    kubectl rollout status deployment/inventory-service -n ecommerce --timeout=5m
+                """
             }
         }
     }
@@ -235,7 +122,7 @@ spec:
         }
         failure {
             echo '❌ Pipeline failed!'
-            echo "Check logs for details"
+            echo 'Check logs for details'
         }
         always {
             echo '🧹 Cleaning up...'
