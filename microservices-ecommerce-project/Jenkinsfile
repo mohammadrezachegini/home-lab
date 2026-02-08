@@ -11,25 +11,51 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo '📥 Checking out code...'
+                echo '📥 ================================'
+                echo '📥 CHECKING OUT CODE'
+                echo '📥 ================================'
                 checkout scm
+                sh '''
+                    pwd
+                    ls -la
+                    echo "Branch: $(git branch --show-current)"
+                '''
             }
         }
         
-        stage('Environment Check') {
+        stage('Navigate to Project') {
             steps {
+                echo '📁 ================================'
+                echo '📁 NAVIGATING TO PROJECT'
+                echo '📁 ================================'
                 dir("${PROJECT_DIR}") {
                     sh '''
-                        echo "✅ Docker: $(docker --version)"
-                        echo "✅ kubectl: $(kubectl version --client --short 2>/dev/null || echo 'installed')"
-                        echo "✅ Build: ${BUILD_NUMBER}"
+                        pwd
+                        ls -la
+                        echo "✅ In project directory"
                     '''
                 }
             }
         }
         
+        stage('Verify Tools') {
+            steps {
+                echo '🔍 ================================'
+                echo '🔍 VERIFYING TOOLS'
+                echo '🔍 ================================'
+                sh '''
+                    echo "Docker: $(docker --version)"
+                    echo "kubectl: $(kubectl version --client --short 2>/dev/null || echo 'installed')"
+                    echo "Build: ${BUILD_NUMBER}"
+                '''
+            }
+        }
+        
         stage('Build Docker Images') {
             steps {
+                echo '🏗️  ================================'
+                echo '🏗️  BUILDING DOCKER IMAGES'
+                echo '🏗️  ================================'
                 dir("${PROJECT_DIR}") {
                     script {
                         def services = ['product-service', 'user-service', 'order-service', 'payment-service', 'inventory-service']
@@ -41,7 +67,7 @@ pipeline {
                                 docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:${IMAGE_TAG} .
                                 docker tag ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:${IMAGE_TAG} \
                                            ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:latest
-                                echo "✅ ${service} built"
+                                echo "✅ ${service} built successfully"
                                 cd ../..
                             """
                         }
@@ -50,48 +76,105 @@ pipeline {
             }
         }
         
-        stage('Push to Registry') {
+        stage('Push to Docker Hub') {
             steps {
-                dir("${PROJECT_DIR}") {
-                    sh '''
-                        echo "Logging in to Docker Hub..."
-                        echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin
-                        
-                        echo "Pushing images..."
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG}
-                        echo "✅ All images pushed!"
-                    '''
-                }
+                echo '📤 ================================'
+                echo '📤 PUSHING TO DOCKER HUB'
+                echo '📤 ================================'
+                sh '''
+                    echo "Logging in..."
+                    echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin
+                    
+                    echo "Pushing images..."
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:latest
+                    
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:latest
+                    
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:latest
+                    
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:latest
+                    
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG}
+                    docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:latest
+                    
+                    echo "✅ All images pushed!"
+                '''
             }
         }
         
         stage('Deploy to Kubernetes') {
             steps {
-                dir("${PROJECT_DIR}") {
-                    sh '''
-                        echo "Deploying to Kubernetes..."
-                        kubectl set image deployment/product-service product-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG} -n ecommerce
-                        kubectl set image deployment/user-service user-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG} -n ecommerce
-                        kubectl set image deployment/order-service order-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG} -n ecommerce
-                        kubectl set image deployment/payment-service payment-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG} -n ecommerce
-                        kubectl set image deployment/inventory-service inventory-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG} -n ecommerce
-                        echo "✅ Deployment complete!"
-                    '''
-                }
+                echo '🚀 ================================'
+                echo '🚀 DEPLOYING TO KUBERNETES'
+                echo '🚀 ================================'
+                sh '''
+                    echo "Updating deployments..."
+                    
+                    kubectl set image deployment/product-service \
+                        product-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG} \
+                        -n ecommerce
+                    
+                    kubectl set image deployment/user-service \
+                        user-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG} \
+                        -n ecommerce
+                    
+                    kubectl set image deployment/order-service \
+                        order-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG} \
+                        -n ecommerce
+                    
+                    kubectl set image deployment/payment-service \
+                        payment-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG} \
+                        -n ecommerce
+                    
+                    kubectl set image deployment/inventory-service \
+                        inventory-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG} \
+                        -n ecommerce
+                    
+                    echo "✅ Deployment commands executed!"
+                '''
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                echo '✅ ================================'
+                echo '✅ VERIFYING DEPLOYMENT'
+                echo '✅ ================================'
+                sh '''
+                    echo "Checking rollout status..."
+                    kubectl rollout status deployment/product-service -n ecommerce --timeout=2m
+                    kubectl rollout status deployment/user-service -n ecommerce --timeout=2m
+                    kubectl rollout status deployment/order-service -n ecommerce --timeout=2m
+                    kubectl rollout status deployment/payment-service -n ecommerce --timeout=2m
+                    kubectl rollout status deployment/inventory-service -n ecommerce --timeout=2m
+                    
+                    echo ""
+                    kubectl get pods -n ecommerce
+                '''
             }
         }
     }
     
     post {
         success {
-            echo '🎉 Pipeline succeeded!'
+            echo ''
+            echo '🎉 ═══════════════════════════════════════'
+            echo '🎉   PIPELINE SUCCEEDED!'
+            echo '🎉 ═══════════════════════════════════════'
+            sh 'echo "Build ${BUILD_NUMBER} - Images: ${IMAGE_TAG}"'
         }
         failure {
-            echo '❌ Pipeline failed!'
+            echo ''
+            echo '❌ ═══════════════════════════════════════'
+            echo '❌   PIPELINE FAILED!'
+            echo '❌ ═══════════════════════════════════════'
+        }
+        always {
+            sh 'docker system prune -f || true'
         }
     }
 }
