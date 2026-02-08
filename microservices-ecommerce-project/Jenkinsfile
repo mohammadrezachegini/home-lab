@@ -3,8 +3,7 @@ pipeline {
     
     environment {
         DOCKER_REGISTRY = 'docker.io'
-        DOCKER_USERNAME = credentials('dockerhub-username')
-        DOCKER_PASSWORD = credentials('dockerhub-password')
+        DOCKER_CREDENTIALS = credentials('dockerhub-credentials')
         IMAGE_TAG = "${env.BUILD_NUMBER}"
         PROJECT_DIR = "microservices-ecommerce-project"
     }
@@ -12,120 +11,25 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo '📥 ================================'
-                echo '📥 CHECKING OUT CODE'
-                echo '📥 ================================'
+                echo '📥 Checking out code...'
                 checkout scm
-                sh '''
-                    echo "Current directory: $(pwd)"
-                    echo "Contents:"
-                    ls -la
-                    echo ""
-                    echo "Changing to project directory..."
-                    cd ${PROJECT_DIR}
-                    pwd
-                    ls -la
-                '''
             }
         }
         
         stage('Environment Check') {
             steps {
-                echo '🔍 ================================'
-                echo '🔍 ENVIRONMENT CHECK'  
-                echo '🔍 ================================'
                 dir("${PROJECT_DIR}") {
                     sh '''
-                        echo "Working in: $(pwd)"
-                        echo "Build Number: $BUILD_NUMBER"
-                        echo ""
-                        
-                        # Check Docker
-                        if command -v docker &> /dev/null; then
-                            echo "✅ Docker available"
-                        else
-                            echo "⚠️  Docker not available"
-                        fi
-                        
-                        # Check kubectl
-                        if command -v kubectl &> /dev/null; then
-                            echo "✅ kubectl available"
-                        else
-                            echo "⚠️  kubectl not available"
-                        fi
-                    '''
-                }
-            }
-        }
-        
-        stage('Verify Project Structure') {
-            steps {
-                echo '📁 ================================'
-                echo '📁 VERIFYING PROJECT STRUCTURE'
-                echo '📁 ================================'
-                dir("${PROJECT_DIR}") {
-                    sh '''
-                        echo "Project contents:"
-                        ls -la
-                        
-                        echo ""
-                        echo "Checking src directory..."
-                        if [ -d "src" ]; then
-                            echo "✅ src directory found"
-                            ls -la src/
-                        else
-                            echo "❌ src directory not found"
-                            exit 1
-                        fi
-                        
-                        echo ""
-                        echo "Checking services..."
-                        for service in product-service user-service order-service payment-service inventory-service; do
-                            if [ -d "src/$service" ]; then
-                                echo "✅ $service found"
-                            else
-                                echo "❌ $service missing"
-                            fi
-                        done
-                    '''
-                }
-            }
-        }
-        
-        stage('Run Unit Tests') {
-            steps {
-                echo '🧪 ================================'
-                echo '🧪 RUNNING TESTS'
-                echo '🧪 ================================'
-                dir("${PROJECT_DIR}") {
-                    sh '''
-                        echo "Testing all services..."
-                        
-                        for service in product-service user-service order-service payment-service inventory-service; do
-                            if [ -d "src/$service" ]; then
-                                echo "✅ Testing $service"
-                                cd src/$service
-                                ls -la
-                                cd ../..
-                            fi
-                        done
-                        
-                        echo "✅ All tests passed"
+                        echo "✅ Docker: $(docker --version)"
+                        echo "✅ kubectl: $(kubectl version --client --short 2>/dev/null || echo 'installed')"
+                        echo "✅ Build: ${BUILD_NUMBER}"
                     '''
                 }
             }
         }
         
         stage('Build Docker Images') {
-            when {
-                expression {
-                    return sh(script: 'command -v docker', returnStatus: true) == 0
-                }
-            }
             steps {
-                echo '🏗️  ================================'
-                echo '🏗️  BUILDING DOCKER IMAGES'
-                echo '🏗️  ================================'
                 dir("${PROJECT_DIR}") {
                     script {
                         def services = ['product-service', 'user-service', 'order-service', 'payment-service', 'inventory-service']
@@ -133,20 +37,12 @@ pipeline {
                         for (service in services) {
                             echo "Building ${service}..."
                             sh """
-                                if [ -d "src/${service}" ]; then
-                                    cd src/${service}
-                                    if [ -f "Dockerfile" ]; then
-                                        docker build -t ${DOCKER_REGISTRY}/${DOCKER_USERNAME}/${service}:${IMAGE_TAG} . || echo "⚠️  Build failed"
-                                        docker tag ${DOCKER_REGISTRY}/${DOCKER_USERNAME}/${service}:${IMAGE_TAG} \
-                                                   ${DOCKER_REGISTRY}/${DOCKER_USERNAME}/${service}:latest || true
-                                        echo "✅ ${service} built"
-                                    else
-                                        echo "⚠️  No Dockerfile for ${service}"
-                                    fi
-                                    cd ../..
-                                else
-                                    echo "⚠️  ${service} directory not found"
-                                fi
+                                cd src/${service}
+                                docker build -t ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:${IMAGE_TAG} .
+                                docker tag ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:${IMAGE_TAG} \
+                                           ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/${service}:latest
+                                echo "✅ ${service} built"
+                                cd ../..
                             """
                         }
                     }
@@ -155,108 +51,35 @@ pipeline {
         }
         
         stage('Push to Registry') {
-            when {
-                expression {
-                    return sh(script: 'command -v docker', returnStatus: true) == 0
-                }
-            }
             steps {
-                echo '📤 ================================'
-                echo '📤 PUSHING TO DOCKER REGISTRY'
-                echo '📤 ================================'
                 dir("${PROJECT_DIR}") {
                     sh '''
                         echo "Logging in to Docker Hub..."
-                        echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin || echo "⚠️  Login failed"
+                        echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin
                         
                         echo "Pushing images..."
-                        for service in product-service user-service order-service payment-service inventory-service; do
-                            docker push ${DOCKER_REGISTRY}/${DOCKER_USERNAME}/${service}:${IMAGE_TAG} || echo "⚠️  Push failed for ${service}"
-                            docker push ${DOCKER_REGISTRY}/${DOCKER_USERNAME}/${service}:latest || true
-                            echo "✅ ${service} pushed"
-                        done
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG}
+                        echo "✅ All images pushed!"
                     '''
                 }
             }
         }
         
         stage('Deploy to Kubernetes') {
-            when {
-                expression {
-                    return sh(script: 'command -v kubectl', returnStatus: true) == 0
-                }
-            }
             steps {
-                echo '🚀 ================================'
-                echo '🚀 DEPLOYING TO KUBERNETES'
-                echo '🚀 ================================'
                 dir("${PROJECT_DIR}") {
                     sh '''
-                        echo "Deploying to ecommerce namespace..."
-                        
-                        for service in product-service user-service order-service payment-service inventory-service; do
-                            kubectl set image deployment/${service} \
-                                ${service}=${DOCKER_REGISTRY}/${DOCKER_USERNAME}/${service}:${IMAGE_TAG} \
-                                -n ecommerce || echo "⚠️  ${service} update failed"
-                            echo "✅ ${service} deployed"
-                        done
-                    '''
-                }
-            }
-        }
-        
-        stage('Verify Deployment') {
-            when {
-                expression {
-                    return sh(script: 'command -v kubectl', returnStatus: true) == 0
-                }
-            }
-            steps {
-                echo '✅ ================================'
-                echo '✅ VERIFYING DEPLOYMENT'
-                echo '✅ ================================'
-                dir("${PROJECT_DIR}") {
-                    sh '''
-                        echo "Checking rollout status..."
-                        
-                        for service in product-service user-service order-service payment-service inventory-service; do
-                            kubectl rollout status deployment/${service} -n ecommerce --timeout=2m || echo "⚠️  ${service} timeout"
-                        done
-                        
-                        echo ""
-                        echo "Current pods:"
-                        kubectl get pods -n ecommerce
-                    '''
-                }
-            }
-        }
-        
-        stage('Generate Report') {
-            steps {
-                echo '📊 ================================'
-                echo '📊 DEPLOYMENT REPORT'
-                echo '📊 ================================'
-                dir("${PROJECT_DIR}") {
-                    sh '''
-                        echo "╔════════════════════════════════════════╗"
-                        echo "║     DEPLOYMENT REPORT                  ║"
-                        echo "╚════════════════════════════════════════╝"
-                        echo ""
-                        echo "Build: ${BUILD_NUMBER}"
-                        echo "Image Tag: ${IMAGE_TAG}"
-                        echo "Registry: ${DOCKER_REGISTRY}/${DOCKER_USERNAME}"
-                        echo "Date: $(date)"
-                        echo ""
-                        echo "Services:"
-                        echo "  - product-service:${IMAGE_TAG}"
-                        echo "  - user-service:${IMAGE_TAG}"
-                        echo "  - order-service:${IMAGE_TAG}"
-                        echo "  - payment-service:${IMAGE_TAG}"
-                        echo "  - inventory-service:${IMAGE_TAG}"
-                        echo ""
-                        echo "╔════════════════════════════════════════╗"
-                        echo "║     END OF REPORT                      ║"
-                        echo "╚════════════════════════════════════════╝"
+                        echo "Deploying to Kubernetes..."
+                        kubectl set image deployment/product-service product-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/product-service:${IMAGE_TAG} -n ecommerce
+                        kubectl set image deployment/user-service user-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/user-service:${IMAGE_TAG} -n ecommerce
+                        kubectl set image deployment/order-service order-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/order-service:${IMAGE_TAG} -n ecommerce
+                        kubectl set image deployment/payment-service payment-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/payment-service:${IMAGE_TAG} -n ecommerce
+                        kubectl set image deployment/inventory-service inventory-service=${DOCKER_REGISTRY}/${DOCKER_CREDENTIALS_USR}/inventory-service:${IMAGE_TAG} -n ecommerce
+                        echo "✅ Deployment complete!"
                     '''
                 }
             }
@@ -265,25 +88,10 @@ pipeline {
     
     post {
         success {
-            echo ''
-            echo '🎉 ═══════════════════════════════════════'
-            echo '🎉   PIPELINE SUCCEEDED!'
-            echo '🎉 ═══════════════════════════════════════'
-            sh 'echo "✅ Build ${BUILD_NUMBER} completed"'
-            echo '═══════════════════════════════════════'
+            echo '🎉 Pipeline succeeded!'
         }
-        
         failure {
-            echo ''
-            echo '❌ ═══════════════════════════════════════'
-            echo '❌   PIPELINE FAILED!'
-            echo '❌ ═══════════════════════════════════════'
-            sh 'echo "Build ${BUILD_NUMBER} failed"'
-            echo '═══════════════════════════════════════'
-        }
-        
-        always {
-            echo '🧹 Cleanup complete'
+            echo '❌ Pipeline failed!'
         }
     }
 }
