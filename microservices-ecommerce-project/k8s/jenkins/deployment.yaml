@@ -14,6 +14,8 @@ spec:
         app: jenkins
     spec:
       serviceAccountName: jenkins
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: jenkins
         image: jenkins/jenkins:lts-jdk17
@@ -25,31 +27,42 @@ spec:
         volumeMounts:
         - name: jenkins-home
           mountPath: /var/jenkins_home
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: docker-bin
+          mountPath: /usr/local/bin/docker
+        - name: kubectl-bin
+          mountPath: /usr/local/bin/kubectl
+        - name: kubeconfig
+          mountPath: /var/jenkins_home/.kube
+        env:
+        - name: DOCKER_HOST
+          value: unix:///var/run/docker.sock
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
             memory: "1Gi"
             cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /login
-            port: 8080
-          initialDelaySeconds: 90
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 5
-        readinessProbe:
-          httpGet:
-            path: /login
-            port: 8080
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
       volumes:
       - name: jenkins-home
         hostPath:
           path: /opt/jenkins-data
+          type: Directory
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: docker-bin
+        hostPath:
+          path: /usr/bin/docker
+          type: File
+      - name: kubectl-bin
+        hostPath:
+          path: /usr/local/bin/kubectl
+          type: File
+      - name: kubeconfig
+        hostPath:
+          path: /home/reza/.kube
           type: Directory

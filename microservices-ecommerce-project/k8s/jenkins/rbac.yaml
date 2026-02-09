@@ -9,18 +9,18 @@ kind: ClusterRole
 metadata:
   name: jenkins
 rules:
-- apiGroups: [""]
-  resources: ["pods", "pods/log"]
-  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-- apiGroups: [""]
-  resources: ["pods/exec"]
-  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-- apiGroups: ["apps"]
-  resources: ["deployments"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: [""]
-  resources: ["services"]
-  verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "create", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -31,6 +31,6 @@ roleRef:
   kind: ClusterRole
   name: jenkins
 subjects:
-- kind: ServiceAccount
-  name: jenkins
-  namespace: jenkins
+  - kind: ServiceAccount
+    name: jenkins
+    namespace: jenkins
