@@ -1306,19 +1306,4 @@ This project is open-source and available for educational purposes.
 
 ---
 
-## 🙏 Acknowledgments
-
-Special thanks to:
-- Brian Hanley (EA Engineer) for gaming industry CI/CD guidance
-- Anthropic Claude for DevOps best practices consultation
-- The Kubernetes community for excellent documentation
-
----
-
-**⭐ If this project helped you, please give it a star!**
-
-**🔗 Connect with me on LinkedIn and let's discuss DevOps!**
-
----
-
 *Last Updated: February 9, 2026*
