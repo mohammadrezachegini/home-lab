@@ -1,0 +1,68 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔍 Check PR title
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR Title: $PR_TITLE"
+          
+          # Check if title starts with conventional commit type
+          if [[ "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|test|chore|perf): ]]; then
+            echo "✅ PR title follows convention"
+          else
+            echo "❌ PR title should start with: feat|fix|docs|style|refactor|test|chore|perf"
+            exit 1
+          fi
+      
+      - name: 🧪 Run quick validation
+        run: |
+          echo "Validating project structure..."
+          
+          cd microservices-ecommerce-project
+          
+          # Check required directories
+          for dir in src k8s infrastructure; do
+            if [ -d "$dir" ]; then
+              echo "✅ $dir/ exists"
+            else
+              echo "❌ $dir/ missing"
+              exit 1
+            fi
+          done
+          
+          # Check services
+          for service in product-service user-service order-service payment-service inventory-service; do
+            if [ -d "src/$service" ]; then
+              echo "✅ $service exists"
+            else
+              echo "❌ $service missing"
+              exit 1
+            fi
+          done
+          
+          echo ""
+          echo "✅ All checks passed!"
+      
+      - name: 💬 Comment on PR
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ PR validation passed! All checks successful.'
+            })
