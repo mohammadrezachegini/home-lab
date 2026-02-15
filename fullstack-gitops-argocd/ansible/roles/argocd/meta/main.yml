@@ -1,0 +1,6 @@
+galaxy_info:
+  role_name: argocd
+  description: Install ArgoCD and configure GitOps applications
+  min_ansible_version: "2.9"
+dependencies:
+  - role: k3s

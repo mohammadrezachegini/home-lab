@@ -1,0 +1,5 @@
+[homelab]
+k3s-server ansible_host=localhost ansible_connection=local ansible_user=reza
+
+[homelab:vars]
+ansible_python_interpreter=/usr/bin/python3

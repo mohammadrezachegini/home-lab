@@ -1,0 +1,6 @@
+galaxy_info:
+  role_name: blog-seed
+  description: Seed MongoDB with initial blog articles
+  min_ansible_version: "2.9"
+dependencies:
+  - role: argocd

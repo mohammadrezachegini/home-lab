@@ -1,0 +1,40 @@
+- name: Create monitoring namespace
+  shell: kubectl create namespace {{ monitoring_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Copy Prometheus config to remote
+  copy:
+    src: prometheus.yml
+    dest: /tmp/prometheus.yml
+    mode: '0644'
+
+- name: Apply Prometheus configmap
+  shell: |
+    kubectl create configmap prometheus-config \
+      --from-file=prometheus.yml=/tmp/prometheus.yml \
+      -n {{ monitoring_namespace }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Deploy Prometheus from template
+  shell: kubectl apply -f /tmp/prometheus-deployment.yml
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Deploy Grafana from template
+  shell: kubectl apply -f /tmp/grafana-deployment.yml
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Wait for monitoring pods to be ready
+  shell: kubectl wait --for=condition=Ready pods --all -n {{ monitoring_namespace }} --timeout=180s
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  notify: Show monitoring info

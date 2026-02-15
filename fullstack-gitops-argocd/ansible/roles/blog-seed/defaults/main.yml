@@ -1,0 +1,3 @@
+blog_namespace: blog-dev
+kubeconfig_path: "/home/{{ ansible_user }}/.kube/config"
+pod_ready_timeout: 300

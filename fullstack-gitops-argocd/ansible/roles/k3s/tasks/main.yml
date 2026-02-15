@@ -1,0 +1,67 @@
+- name: Check if K3s is already installed
+  stat:
+    path: "{{ k3s_binary }}"
+  register: k3s_installed
+
+- name: Download and install K3s
+  shell: curl -sfL {{ k3s_install_script }} | sh -
+  when: not k3s_installed.stat.exists
+
+- name: Enable and start K3s service
+  systemd:
+    name: k3s
+    enabled: yes
+    state: started
+
+- name: Wait for K3s API to be ready
+  wait_for:
+    port: 6443
+    host: localhost
+    delay: 10
+    timeout: 120
+
+- name: Create .kube directory for user
+  file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Check if kubeconfig already exists
+  stat:
+    path: "{{ kubeconfig_path }}"
+  register: kubeconfig_exists
+
+- name: Check if k3s kubeconfig is readable
+  stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: k3s_kubeconfig
+
+- name: Copy kubeconfig for user
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ kubeconfig_path }}"
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  when: k3s_kubeconfig.stat.exists and k3s_kubeconfig.stat.readable
+
+- name: Fix kubeconfig server address
+  replace:
+    path: "{{ kubeconfig_path }}"
+    regexp: 'https://127.0.0.1:6443'
+    replace: "https://{{ k3s_server_ip }}:6443"
+  when: kubeconfig_exists.stat.exists or k3s_kubeconfig.stat.exists
+
+- name: Verify K3s nodes
+  shell: kubectl get nodes
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: k3s_nodes
+
+- name: Show K3s nodes
+  debug:
+    msg: "{{ k3s_nodes.stdout }}"

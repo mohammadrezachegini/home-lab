@@ -1,0 +1,5 @@
+argocd_namespace: argocd
+argocd_version: stable
+kubeconfig_path: "/home/{{ ansible_user }}/.kube/config"
+argocd_server_ip: "10.0.0.126"
+argocd_port: 8090

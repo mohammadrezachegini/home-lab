@@ -1,0 +1,5 @@
+argocd_install_url: "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+argocd_apps:
+  - dev-app.yaml
+  - staging-app.yaml
+  - prod-app.yaml

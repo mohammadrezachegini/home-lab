@@ -1,0 +1,2 @@
+backend_label: "app=blog-backend"
+seed_command: "node src/seed.js"

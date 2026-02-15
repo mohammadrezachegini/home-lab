@@ -1,0 +1,12 @@
+- name: Show monitoring info
+  debug:
+    msg:
+      - "Prometheus: http://10.0.0.126:{{ prometheus_nodeport }}"
+      - "Grafana:    http://10.0.0.126:{{ grafana_nodeport }}"
+      - "Grafana login: admin / {{ grafana_admin_password }}"
+
+- name: Restart Prometheus
+  shell: kubectl rollout restart deployment/prometheus -n {{ monitoring_namespace }}
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"

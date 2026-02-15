@@ -1,0 +1,8 @@
+- name: Show K3s nodes
+  debug:
+    msg: "{{ k3s_nodes.stdout }}"
+
+- name: Restart K3s
+  systemd:
+    name: k3s
+    state: restarted

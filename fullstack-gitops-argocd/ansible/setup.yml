@@ -1,0 +1,46 @@
+- name: Setup Full GitOps Infrastructure
+  hosts: homelab
+  become: true
+
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - git
+          - apt-transport-https
+        state: present
+
+    - name: Create temp directory for manifests
+      file:
+        path: /tmp/argocd-apps
+        state: directory
+        mode: '0755'
+
+  roles:
+    - role: k3s
+      tags: k3s
+    - role: argocd
+      tags: argocd
+    - role: monitoring
+      tags: monitoring
+    - role: blog-seed
+      tags: seed
+
+  post_tasks:
+    - name: Infrastructure setup complete
+      debug:
+        msg:
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "✅  GitOps Infrastructure is Ready!"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "ArgoCD UI:   https://10.0.0.126:8090"
+          - "Grafana:     http://10.0.0.126:30300"
+          - "Prometheus:  http://10.0.0.126:30090"
+          - "Blog Dev:    http://10.0.0.126:30080"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

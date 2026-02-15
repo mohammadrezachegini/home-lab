@@ -1,0 +1,5 @@
+monitoring_namespace: monitoring
+grafana_admin_password: admin
+grafana_nodeport: 30300
+prometheus_nodeport: 30090
+kubeconfig_path: "/home/{{ ansible_user }}/.kube/config"

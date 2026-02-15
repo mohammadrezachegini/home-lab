@@ -1,0 +1,3 @@
+- name: Show seed result
+  debug:
+    msg: "{{ seed_result.stdout }}"

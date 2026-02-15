@@ -1,0 +1,39 @@
+- name: Create ArgoCD namespace
+  shell: kubectl create namespace {{ argocd_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Install ArgoCD
+  shell: kubectl apply -n {{ argocd_namespace }} -f {{ argocd_install_url }}
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Wait for ArgoCD pods to be ready
+  shell: kubectl wait --for=condition=Ready pods --all -n {{ argocd_namespace }} --timeout=300s
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Copy ArgoCD app manifests to remote
+  copy:
+    src: "{{ item }}"
+    dest: "/tmp/{{ item }}"
+    mode: '0644'
+  loop: "{{ argocd_apps }}"
+
+- name: Apply ArgoCD applications
+  shell: kubectl apply -f /tmp/{{ item }}
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  loop: "{{ argocd_apps }}"
+
+- name: Get ArgoCD initial admin password
+  shell: kubectl -n {{ argocd_namespace }} get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: argocd_password
+  notify: Show ArgoCD info

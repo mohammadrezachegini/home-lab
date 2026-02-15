@@ -1,0 +1,6 @@
+galaxy_info:
+  role_name: monitoring
+  description: Deploy Prometheus and Grafana monitoring stack
+  min_ansible_version: "2.9"
+dependencies:
+  - role: k3s

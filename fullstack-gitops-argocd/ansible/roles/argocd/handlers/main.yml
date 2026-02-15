@@ -1,0 +1,6 @@
+- name: Show ArgoCD info
+  debug:
+    msg:
+      - "ArgoCD UI: https://{{ argocd_server_ip }}:{{ argocd_port }}"
+      - "Username: admin"
+      - "Password: {{ argocd_password.stdout }}"

@@ -1,0 +1,34 @@
+- name: Wait for blog-dev pods to be ready
+  shell: kubectl wait --for=condition=Ready pods --all -n {{ blog_namespace }} --timeout={{ pod_ready_timeout }}s
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+- name: Get backend pod name
+  shell: kubectl get pods -n {{ blog_namespace }} -l {{ backend_label }} -o jsonpath='{.items[0].metadata.name}'
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: backend_pod
+
+- name: Check if articles already exist
+  shell: kubectl exec -n {{ blog_namespace }} {{ backend_pod.stdout }} -- node -e "const mongoose=require('mongoose');mongoose.connect(process.env.MONGODB_URL).then(async()=>{const count=await mongoose.connection.db.collection('articles').countDocuments();console.log(count);mongoose.disconnect();})"
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: article_count
+  ignore_errors: yes
+
+- name: Seed MongoDB with articles
+  shell: kubectl exec -n {{ blog_namespace }} {{ backend_pod.stdout }} -- {{ seed_command }}
+  become_user: "{{ ansible_user }}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: article_count.stdout | int == 0
+  register: seed_result
+  notify: Show seed result
+
+- name: Skip seeding message
+  debug:
+    msg: "Articles already exist ({{ article_count.stdout }} found) — skipping seed"
+  when: article_count.stdout | int > 0
