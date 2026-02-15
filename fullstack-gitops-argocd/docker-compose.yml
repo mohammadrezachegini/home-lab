@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: blog-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - blog-network
+
+  backend:
+    build: ./backend
+    container_name: blog-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URL=mongodb://mongodb:27017/devops-blog
+      - PORT=3001
+    depends_on:
+      - mongodb
+    networks:
+      - blog-network
+
+  frontend:
+    build: ./frontend
+    container_name: blog-frontend
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    networks:
+      - blog-network
+
+networks:
+  blog-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
