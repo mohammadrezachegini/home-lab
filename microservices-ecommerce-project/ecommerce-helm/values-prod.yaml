@@ -1,0 +1,78 @@
+# =============================================================================
+# Production Environment Values
+# Overrides values.yaml for production
+# Usage: helm install ecommerce . -f values-prod.yaml
+# =============================================================================
+
+global:
+  environment: production
+
+image:
+  # Set your Docker Hub username here
+  registry: "rezaops"
+  tag: "latest"
+  pullPolicy: Always
+
+# Higher replicas for HA in production
+services:
+  product:
+    replicas: 3
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  user:
+    replicas: 3
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  order:
+    replicas: 3
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  payment:
+    replicas: 3
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  inventory:
+    replicas: 3
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "200m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+postgres:
+  storage: 10Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+# IMPORTANT: Override database credentials in production!
+# helm install ecommerce . -f values-prod.yaml \
+#   --set database.password=YOUR_SECURE_PASSWORD \
+#   --set database.secretKey=YOUR_SECRET_KEY \
+#   --set monitoring.grafana.adminPassword=YOUR_GRAFANA_PASSWORD

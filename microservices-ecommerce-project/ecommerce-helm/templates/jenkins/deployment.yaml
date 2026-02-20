@@ -1,0 +1,88 @@
+{{- if .Values.jenkins.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: {{ .Values.jenkins.namespace }}
+  labels:
+    app: jenkins
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      serviceAccountName: jenkins
+      securityContext:
+        fsGroup: 1000
+      containers:
+      - name: jenkins
+        image: {{ .Values.jenkins.image }}
+        ports:
+        - containerPort: {{ .Values.jenkins.port }}
+          name: http
+        - containerPort: {{ .Values.jenkins.agentPort }}
+          name: agent
+        env:
+        - name: DOCKER_HOST
+          value: unix:///var/run/docker.sock
+        volumeMounts:
+        - name: jenkins-home
+          mountPath: /var/jenkins_home
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: docker-bin
+          mountPath: /usr/local/bin/docker
+        - name: kubectl-bin
+          mountPath: /usr/local/bin/kubectl
+        - name: kubeconfig
+          mountPath: /var/jenkins_home/.kube
+        resources:
+          {{- toYaml .Values.jenkins.resources | nindent 10 }}
+      volumes:
+      - name: jenkins-home
+        hostPath:
+          path: {{ .Values.jenkins.dataPath }}
+          type: Directory
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: docker-bin
+        hostPath:
+          path: /usr/bin/docker
+          type: File
+      - name: kubectl-bin
+        hostPath:
+          path: /usr/local/bin/kubectl
+          type: File
+      - name: kubeconfig
+        hostPath:
+          path: {{ .Values.jenkins.kubeconfigPath }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins
+  namespace: {{ .Values.jenkins.namespace }}
+  labels:
+    app: jenkins
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  selector:
+    app: jenkins
+  ports:
+  - port: {{ .Values.jenkins.port }}
+    targetPort: {{ .Values.jenkins.port }}
+    nodePort: {{ .Values.jenkins.nodePort }}
+    name: http
+  - port: {{ .Values.jenkins.agentPort }}
+    targetPort: {{ .Values.jenkins.agentPort }}
+    name: agent
+{{- end }}

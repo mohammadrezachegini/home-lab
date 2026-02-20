@@ -1,0 +1,70 @@
+# =============================================================================
+# Dev Environment Values
+# Overrides values.yaml for development
+# Usage: helm install ecommerce . -f values-dev.yaml
+# =============================================================================
+
+global:
+  environment: development
+
+image:
+  tag: "latest"
+  pullPolicy: Always
+
+# Scale down for dev - save resources
+services:
+  product:
+    replicas: 1
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+  user:
+    replicas: 1
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+  order:
+    replicas: 1
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+  payment:
+    replicas: 1
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+  inventory:
+    replicas: 1
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+
+postgres:
+  storage: 500Mi
+
+# Disable monitoring and jenkins in dev to save resources
+monitoring:
+  enabled: false
+
+jenkins:
+  enabled: false

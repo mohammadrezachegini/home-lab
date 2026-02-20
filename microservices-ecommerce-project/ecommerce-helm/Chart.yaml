@@ -1,0 +1,16 @@
+apiVersion: v2
+name: ecommerce-platform
+description: Microservices E-Commerce Platform - Complete Kubernetes deployment with CI/CD and monitoring
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - ecommerce
+  - microservices
+  - kubernetes
+  - devops
+
+maintainers:
+  - name: Reza
+    url: https://rezaops.com

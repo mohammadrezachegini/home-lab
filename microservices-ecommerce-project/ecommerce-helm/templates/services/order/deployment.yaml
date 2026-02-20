@@ -1,0 +1,62 @@
+{{- if .Values.services.order.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.services.order.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.services.order.name }}
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.services.order.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.services.order.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.services.order.name }}
+    spec:
+      containers:
+      - name: {{ .Values.services.order.name }}
+        image: {{ include "ecommerce.image" (dict "registry" .Values.image.registry "image" .Values.services.order.image "tag" .Values.image.tag) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.order.port }}
+          name: http
+        env:
+        - name: PORT
+          value: "{{ .Values.services.order.port }}"
+        {{- include "ecommerce.dbEnvVars" . | nindent 8 }}
+        resources:
+          {{- toYaml .Values.services.order.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.order.port }}
+          initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.order.port }}
+          initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.order.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.services.order.name }}
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ .Values.services.order.name }}
+  ports:
+  - port: {{ .Values.services.order.port }}
+    targetPort: {{ .Values.services.order.port }}
+    protocol: TCP
+    name: http
+{{- end }}

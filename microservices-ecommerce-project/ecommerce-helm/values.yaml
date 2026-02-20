@@ -1,0 +1,183 @@
+# =============================================================================
+# Ecommerce Platform - Helm Values
+# =============================================================================
+# Override any value with:
+#   helm install ecommerce . -f my-values.yaml
+#   helm install ecommerce . --set image.tag=v2
+
+# -----------------------------------------------------------------------------
+# Global settings
+# -----------------------------------------------------------------------------
+global:
+  namespace: ecommerce
+  environment: production
+
+# -----------------------------------------------------------------------------
+# Docker image settings
+# -----------------------------------------------------------------------------
+image:
+  registry: ""           # e.g. "rezaops" for Docker Hub, leave empty for local
+  tag: "v1"
+  pullPolicy: Never      # Change to "Always" when using Docker Hub registry
+
+# -----------------------------------------------------------------------------
+# Microservices
+# -----------------------------------------------------------------------------
+services:
+  product:
+    enabled: true
+    name: product-service
+    port: 8001
+    replicas: 2
+    image: product-service
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+  user:
+    enabled: true
+    name: user-service
+    port: 8002
+    replicas: 2
+    image: user-service
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+  order:
+    enabled: true
+    name: order-service
+    port: 8003
+    replicas: 2
+    image: order-service
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+  payment:
+    enabled: true
+    name: payment-service
+    port: 8004
+    replicas: 2
+    image: payment-service
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+  inventory:
+    enabled: true
+    name: inventory-service
+    port: 8005
+    replicas: 2
+    image: inventory-service
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+# -----------------------------------------------------------------------------
+# PostgreSQL
+# -----------------------------------------------------------------------------
+postgres:
+  enabled: true
+  image: postgres:15-alpine
+  port: 5432
+  storage: 1Gi
+  storageClass: local-path    # K3s default storage class
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# -----------------------------------------------------------------------------
+# Database credentials (override in production with --set or secrets manager)
+# -----------------------------------------------------------------------------
+database:
+  name: ecommerce
+  user: postgres
+  password: postgres
+  secretKey: "change-this-in-production"
+
+# -----------------------------------------------------------------------------
+# Ingress
+# -----------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  cors:
+    enabled: true
+    allowOrigin: "*"
+    allowMethods: "GET, POST, PUT, DELETE, OPTIONS"
+
+# -----------------------------------------------------------------------------
+# Monitoring (Prometheus + Grafana)
+# -----------------------------------------------------------------------------
+monitoring:
+  enabled: true
+  namespace: monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    port: 9090
+    nodePort: 30090
+    storage: 2Gi
+    storageClass: local-path
+
+  grafana:
+    image: grafana/grafana:latest
+    port: 3000
+    nodePort: 30300
+    adminPassword: admin123
+
+# -----------------------------------------------------------------------------
+# Jenkins
+# -----------------------------------------------------------------------------
+jenkins:
+  enabled: true
+  namespace: jenkins
+  image: jenkins/jenkins:lts-jdk17
+  port: 8080
+  agentPort: 50000
+  nodePort: 30000
+  dataPath: /opt/jenkins-data
+  kubeconfigPath: /home/reza/.kube
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# -----------------------------------------------------------------------------
+# Health check probes
+# -----------------------------------------------------------------------------
+probes:
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 5

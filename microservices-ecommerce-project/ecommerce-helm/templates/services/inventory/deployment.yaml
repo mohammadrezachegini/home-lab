@@ -1,0 +1,62 @@
+{{- if .Values.services.inventory.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.services.inventory.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.services.inventory.name }}
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.services.inventory.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.services.inventory.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.services.inventory.name }}
+    spec:
+      containers:
+      - name: {{ .Values.services.inventory.name }}
+        image: {{ include "ecommerce.image" (dict "registry" .Values.image.registry "image" .Values.services.inventory.image "tag" .Values.image.tag) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.inventory.port }}
+          name: http
+        env:
+        - name: PORT
+          value: "{{ .Values.services.inventory.port }}"
+        {{- include "ecommerce.dbEnvVars" . | nindent 8 }}
+        resources:
+          {{- toYaml .Values.services.inventory.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.inventory.port }}
+          initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.inventory.port }}
+          initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.inventory.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.services.inventory.name }}
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ .Values.services.inventory.name }}
+  ports:
+  - port: {{ .Values.services.inventory.port }}
+    targetPort: {{ .Values.services.inventory.port }}
+    protocol: TCP
+    name: http
+{{- end }}

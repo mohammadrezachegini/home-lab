@@ -1,0 +1,62 @@
+{{- if .Values.services.payment.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.services.payment.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.services.payment.name }}
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.services.payment.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.services.payment.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.services.payment.name }}
+    spec:
+      containers:
+      - name: {{ .Values.services.payment.name }}
+        image: {{ include "ecommerce.image" (dict "registry" .Values.image.registry "image" .Values.services.payment.image "tag" .Values.image.tag) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.payment.port }}
+          name: http
+        env:
+        - name: PORT
+          value: "{{ .Values.services.payment.port }}"
+        {{- include "ecommerce.dbEnvVars" . | nindent 8 }}
+        resources:
+          {{- toYaml .Values.services.payment.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.payment.port }}
+          initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.services.payment.port }}
+          initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.payment.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.services.payment.name }}
+    {{- include "ecommerce.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ .Values.services.payment.name }}
+  ports:
+  - port: {{ .Values.services.payment.port }}
+    targetPort: {{ .Values.services.payment.port }}
+    protocol: TCP
+    name: http
+{{- end }}
