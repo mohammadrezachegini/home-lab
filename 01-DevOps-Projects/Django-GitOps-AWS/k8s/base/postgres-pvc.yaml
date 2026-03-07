@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce       # Only one pod can mount this at a time (fine for Postgres)
+  resources:
+    requests:
+      storage: 1Gi        # Overlays can patch this up for staging/prod

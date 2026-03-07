@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-api
+spec:
+  replicas: 3    # 3 replicas for prod HA
+  template:
+    spec:
+      containers:
+        - name: django-api
+          imagePullPolicy: Always
+          env:
+            - name: DEBUG
+              value: "False"
+            - name: ALLOWED_HOSTS
+              value: "localhost,127.0.0.1"
+            - name: DB_HOST
+              # RDS endpoint — managed PostgreSQL, not a pod
+              value: "django-gitops-postgres.czasg4cict9w.us-east-1.rds.amazonaws.com"
+            - name: DB_PORT
+              value: "5432"
+          # Higher resource limits for prod
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"

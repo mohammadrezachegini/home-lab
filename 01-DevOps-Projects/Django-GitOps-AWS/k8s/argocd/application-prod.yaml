@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: django-api-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/mohammadrezachegini/Django-GitOps-AWS.git
+    targetRevision: master
+    path: k8s/overlays/prod
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prod
+
+  syncPolicy:
+    # NO automated sync for prod.
+    # A human must click Sync in the ArgoCD UI or run:
+    # argocd app sync django-api-prod
+    syncOptions:
+      - CreateNamespace=true

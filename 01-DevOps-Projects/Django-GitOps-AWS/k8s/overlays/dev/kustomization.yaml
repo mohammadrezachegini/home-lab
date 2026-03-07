@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+namespace: dev
+
+# The CI pipeline will update this image tag automatically on every build.
+# ArgoCD watches this file — when the tag changes, it resyncs and deploys.
+images:
+  - name: django-api
+    newName: 381492238320.dkr.ecr.us-east-1.amazonaws.com/django-gitops/django-api
+    newTag: sha-712ea4e
+
+patches:
+  - path: patches/deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: django-api
+
+commonLabels:
+  environment: dev

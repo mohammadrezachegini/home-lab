@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# "resources" replaces deprecated "bases"
+resources:
+  - ../../base
+
+namespace: local
+
+patches:
+  - path: patches/deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: django-api
+
+# "labels" replaces deprecated "commonLabels"
+labels:
+  - pairs:
+      environment: local

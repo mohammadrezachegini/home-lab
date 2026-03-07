@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: django-api-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/mohammadrezachegini/django-gitops-aws.git
+    targetRevision: master
+    path: k8s/overlays/local    # Watch the dev overlay
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: django-api-local
+#   namespace: argocd             # ArgoCD always lives in the argocd namespace
+#   # Finalizer ensures ArgoCD cleans up K8s resources when this app is deleted
+#   finalizers:
+#     - resources-finalizer.argocd.argoproj.io
+# spec:
+#   project: default
+
+#   # WHERE to get the manifests from (your GitHub repo)
+#   source:
+#     repoURL: https://github.com/mohammadrezachegini/Django-GitOps-AWS.git
+#     targetRevision: master        # Watch the main branch
+#     path: k8s/overlays/local    # Use the local overlay
+
+#   # WHERE to deploy (the local K3s cluster)
+#   destination:
+#     server: https://kubernetes.default.svc   # "this cluster"
+#     namespace: local
+
+#   syncPolicy:
+#     automated:
+#       prune: true       # Delete K8s resources removed from Git
+#       selfHeal: true    # Re-sync if someone manually changes something in K8s
+#     syncOptions:
+#       - CreateNamespace=true    # Auto-create the "local" namespace if it doesn't exist

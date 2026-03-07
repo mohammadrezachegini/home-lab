@@ -1,0 +1,39 @@
+# vault/vault-values.yaml
+#
+# Vault configuration for local K3s development.
+# We use "dev" server mode — this means:
+#   - Vault starts unsealed automatically (no manual unseal needed)
+#   - Data is stored in memory (not persisted across pod restarts)
+#   - Root token is set to "root" for easy local access
+#
+# IMPORTANT: Dev mode is ONLY for local testing.
+# In AWS (Phase 4) we'll use a proper Vault with persistent storage,
+# TLS, and proper unseal configuration (or use HCP Vault).
+
+server:
+  dev:
+    enabled: true
+    devRootToken: "root"    # Root token for local access — never do this in prod
+
+  # Resource limits for local laptop
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+  # Readiness probe — wait until Vault is unsealed before accepting traffic
+  readinessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true"
+
+# Disable the Vault UI for local (optional — set to true if you want the UI)
+ui:
+  enabled: true
+  serviceType: ClusterIP
+
+# We don't need high availability for local
+injector:
+  enabled: false    # We use External Secrets Operator instead of Vault Agent injector

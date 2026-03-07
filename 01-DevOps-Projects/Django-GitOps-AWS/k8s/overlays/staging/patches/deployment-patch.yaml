@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-api
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: django-api
+          imagePullPolicy: Always
+          env:
+            - name: DEBUG
+              value: "False"
+            - name: ALLOWED_HOSTS
+              value: "localhost,127.0.0.1"
+            - name: DB_HOST
+              value: "postgres"    # postgres pod in staging namespace
+            - name: DB_PORT
+              value: "5432"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

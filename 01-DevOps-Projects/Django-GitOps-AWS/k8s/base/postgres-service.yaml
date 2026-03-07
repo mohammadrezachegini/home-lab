@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  # ClusterIP means only reachable inside the cluster.
+  # Django connects to "postgres:5432" — Kubernetes DNS resolves
+  # the service name "postgres" to this ClusterIP automatically.
+  type: ClusterIP

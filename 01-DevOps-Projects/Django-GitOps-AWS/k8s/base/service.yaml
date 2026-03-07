@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-api
+spec:
+  selector:
+    app: django-api
+  ports:
+    - port: 80
+      targetPort: 8000
+  # ClusterIP: the Ingress controller routes external traffic to this service.
+  # In local overlay we'll also add a NodePort so you can access it directly
+  # without going through ingress, for easier testing.
+  type: ClusterIP

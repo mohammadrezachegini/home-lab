@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-api
+spec:
+  replicas: 2    # Run 2 replicas in dev for basic HA
+  template:
+    spec:
+      containers:
+        - name: django-api
+          # Pull from ECR — nodes have IAM permission to pull automatically
+          imagePullPolicy: Always
+          env:
+            - name: DEBUG
+              value: "False"
+            - name: ALLOWED_HOSTS
+              # RDS endpoint + ALB hostname will be added here in Phase 6
+              value: "localhost,127.0.0.1"
+            - name: DB_HOST
+              # RDS endpoint from terraform output
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"

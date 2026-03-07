@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-api
+spec:
+  template:
+    spec:
+      containers:
+        - name: django-api
+          # Use the locally built image.
+          # imagePullPolicy: Never tells K3s not to try to pull from a registry —
+          # it uses the image already loaded into the local containerd cache.
+          image: django-api:local
+          imagePullPolicy: Never
+          env:
+            # Patch DEBUG to True for local development
+            - name: DEBUG
+              value: "True"
+            # Add your laptop IP to ALLOWED_HOSTS
+            - name: ALLOWED_HOSTS
+              value: "localhost,127.0.0.1,django.local,10.0.0.126"
