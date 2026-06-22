@@ -1,0 +1,84 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Template: Deploy a new app with a subdomain
+# Usage: copy this file, fill in YOUR_APP values, then:
+#   kubectl apply -f my-django-app.yml
+#
+# After applying:
+#   1. Add DNS record in Pi-hole:
+#      address=/myapp.rezaops.com/10.0.0.200
+#   2. Access at: http://myapp.rezaops.com
+# ─────────────────────────────────────────────────────────────
+
+# ── Namespace ─────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: django-app          # change to your app name
+
+---
+# ── Deployment ────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-app
+  namespace: django-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django-app
+  template:
+    metadata:
+      labels:
+        app: django-app
+    spec:
+      nodeSelector:
+        workload: apps         # runs on thor (M1 Plus)
+      containers:
+      - name: django-app
+        image: 10.0.0.200:5000/django-app:latest   # your local registry
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DEBUG
+          value: "False"
+        - name: ALLOWED_HOSTS
+          value: "myapp.rezaops.com"
+        - name: DATABASE_URL
+          value: "postgresql://user:pass@postgres:5432/mydb"
+
+---
+# ── Service ───────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-app
+  namespace: django-app
+spec:
+  selector:
+    app: django-app
+  ports:
+  - port: 8000
+    targetPort: 8000
+
+---
+# ── Ingress — this is the only thing needed for the domain ────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: django-app-ingress
+  namespace: django-app
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: myapp.rezaops.com     # ← change to your subdomain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: django-app    # ← must match Service name above
+            port:
+              number: 8000      # ← must match your app port

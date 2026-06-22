@@ -1,0 +1,101 @@
+---
+# ─────────────────────────────────────────
+# Role: networking
+# Applies to: all nodes
+# ─────────────────────────────────────────
+
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
+
+- name: Allow SSH
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Open control plane firewall ports
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  loop:
+    - { port: "6443",  proto: "tcp", comment: "K3s API server" }
+    - { port: "2379",  proto: "tcp", comment: "etcd client" }
+    - { port: "2380",  proto: "tcp", comment: "etcd peer" }
+    - { port: "10250", proto: "tcp", comment: "Kubelet" }
+    - { port: "10251", proto: "tcp", comment: "Scheduler" }
+    - { port: "10252", proto: "tcp", comment: "Controller manager" }
+    - { port: "8472",  proto: "udp", comment: "Flannel VXLAN" }
+    - { port: "51820", proto: "udp", comment: "WireGuard" }
+  when: node_role == "control-plane"
+
+- name: Open worker firewall ports
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  loop:
+    - { port: "10250", proto: "tcp", comment: "Kubelet" }
+    - { port: "8472",  proto: "udp", comment: "Flannel VXLAN" }
+    - { port: "51820", proto: "udp", comment: "WireGuard" }
+  when: node_role == "worker"
+
+- name: Open Longhorn ports on all nodes
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  loop:
+    - { port: "9500",  proto: "tcp", comment: "Longhorn manager" }
+    - { port: "9501",  proto: "tcp", comment: "Longhorn engine" }
+
+- name: Open app service ports (reachable from any device on LAN)
+  ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: tcp
+    comment: "{{ item.comment }}"
+  loop:
+    # ── Monitoring ─────────────────────────────────────────
+    - { port: "80",   comment: "HTTP / Grafana / ArgoCD / Longhorn UI" }
+    - { port: "443",  comment: "HTTPS" }
+    - { port: "3000", comment: "Grafana (direct)" }
+    - { port: "9090", comment: "Prometheus (direct)" }
+    - { port: "9093", comment: "Alertmanager" }
+    - { port: "3100", comment: "Loki" }
+    - { port: "16686",comment: "Jaeger UI" }
+    - { port: "14268",comment: "Jaeger collector" }
+    # ── CI/CD ──────────────────────────────────────────────
+    - { port: "8080", comment: "Jenkins UI" }
+    - { port: "50000",comment: "Jenkins agent JNLP" }
+    - { port: "5000", comment: "Local container registry" }
+    # ── GitOps ─────────────────────────────────────────────
+    - { port: "8200", comment: "Vault UI + API" }
+    # ── MetalLB LoadBalancer pool ──────────────────────────
+    - { port: "30000:32767", comment: "K3s NodePort range" }
+
+- name: Allow all traffic from cluster network
+  ufw:
+    rule: allow
+    src: "{{ lab_network }}"
+
+- name: Allow MetalLB IP pool range inbound
+  ufw:
+    rule: allow
+    src: "10.0.0.200/28"
+    comment: "MetalLB LoadBalancer pool"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Reload UFW to apply all rules
+  ufw:
+    state: reloaded

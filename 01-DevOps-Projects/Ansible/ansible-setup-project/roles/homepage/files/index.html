@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reza's Home Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #f8f7f4;
+    --surface:   #ffffff;
+    --border:    rgba(0,0,0,0.08);
+    --border-md: rgba(0,0,0,0.14);
+    --text:      #1a1a18;
+    --muted:     #6b6b68;
+    --hint:      #a0a09c;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Inter', sans-serif;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        #111110;
+      --surface:   #1c1c1a;
+      --border:    rgba(255,255,255,0.08);
+      --border-md: rgba(255,255,255,0.14);
+      --text:      #e8e8e4;
+      --muted:     #888884;
+      --hint:      #555552;
+    }
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 32px 24px 64px;
+  }
+
+  .wrap { max-width: 780px; margin: 0 auto; }
+
+  .hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .hero-left { display: flex; align-items: center; gap: 14px; }
+
+  .avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: #EEEDFE;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 500; color: #534AB7;
+    flex-shrink: 0;
+  }
+
+  .hero-name { font-size: 15px; font-weight: 500; }
+  .hero-sub  { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 1px; }
+
+  .nodes { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .node-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 0.5px solid #5DCAA5;
+    background: #E1F5EE;
+    font-size: 11px; font-weight: 500; color: #0F6E56;
+    font-family: var(--mono);
+  }
+
+  .node-dot { width: 6px; height: 6px; border-radius: 50%; background: #1D9E75; flex-shrink: 0; }
+
+  .section { margin-bottom: 20px; }
+
+  .section-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .section-icon {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+  }
+
+  .section-label {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .section-line { flex: 1; height: 0.5px; background: var(--border); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 8px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.12s;
+    color: inherit;
+  }
+
+  .card:hover { border-color: var(--border-md); }
+
+  .card-header {
+    display: flex; align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .card-icon {
+    width: 34px; height: 34px;
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+  }
+
+  .badge {
+    font-size: 10px; font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+
+  .badge-online { background: #E1F5EE; color: #0F6E56; }
+  .badge-soon   { background: var(--bg); color: var(--hint); border: 0.5px solid var(--border); }
+
+  .card-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+  .card-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  .card-url {
+    font-size: 10px; color: var(--hint);
+    margin-top: 10px; padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+    font-family: var(--mono);
+    display: flex; align-items: center; justify-content: space-between;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .card-ghost { border-style: dashed; opacity: 0.45; pointer-events: none; }
+
+  svg.ico { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+  svg.ico-sm { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.45; }
+
+  .ic-blue   { background: #E6F1FB; color: #185FA5; }
+  .ic-amber  { background: #FAEEDA; color: #854F0B; }
+  .ic-purple { background: #EEEDFE; color: #534AB7; }
+  .ic-green  { background: #EAF3DE; color: #3B6D11; }
+  .ic-teal   { background: #E1F5EE; color: #0F6E56; }
+  .ic-gray   { background: #F1EFE8; color: #5F5E5A; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-left">
+      <div class="avatar">RC</div>
+      <div>
+        <div class="hero-name">Reza's Home Lab</div>
+        <div class="hero-sub">rezaops.com &nbsp;·&nbsp; Burnaby, BC</div>
+      </div>
+    </div>
+    <div class="nodes">
+      <div class="node-pill">
+        <div class="node-dot"></div>
+        <svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        jarvis
+      </div>
+      <div class="node-pill">
+        <div class="node-dot"></div>
+        <svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        thor
+      </div>
+    </div>
+  </div>
+
+  <!-- Monitoring -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon ic-blue">
+        <svg class="ico" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <span class="section-label">Monitoring</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="grid">
+      <a class="card" href="http://grafana.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-blue">
+            <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Grafana</div>
+        <div class="card-desc">Metrics &amp; dashboards</div>
+        <div class="card-url">grafana.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+      <a class="card" href="http://prometheus.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-blue">
+            <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Prometheus</div>
+        <div class="card-desc">Metrics collection</div>
+        <div class="card-url">prometheus.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+      <a class="card" href="http://alertmanager.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-blue">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Alertmanager</div>
+        <div class="card-desc">Alert routing</div>
+        <div class="card-url">alertmanager.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+      <a class="card" href="http://jaeger.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-blue">
+            <svg class="ico" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Jaeger</div>
+        <div class="card-desc">Distributed tracing</div>
+        <div class="card-url">jaeger.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+    </div>
+  </div>
+
+  <!-- CI/CD -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon ic-amber">
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      </div>
+      <span class="section-label">CI/CD</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="grid">
+      <a class="card" href="http://jenkins.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-amber">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Jenkins</div>
+        <div class="card-desc">Build pipelines</div>
+        <div class="card-url">jenkins.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+      <a class="card" href="http://registry.rezaops.com/v2/_catalog">
+        <div class="card-header">
+          <div class="card-icon ic-amber">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Registry</div>
+        <div class="card-desc">Container images</div>
+        <div class="card-url">registry.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+    </div>
+  </div>
+
+  <!-- GitOps -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon ic-purple">
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6"/><path d="M15.7 15.7L9 9"/></svg>
+      </div>
+      <span class="section-label">GitOps</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="grid">
+      <a class="card" href="http://argocd.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-purple">
+            <svg class="ico" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6"/><path d="M15.7 15.7L9 9"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">ArgoCD</div>
+        <div class="card-desc">GitOps deployments</div>
+        <div class="card-url">argocd.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+      <a class="card" href="http://vault.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-purple">
+            <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Vault</div>
+        <div class="card-desc">Secrets management</div>
+        <div class="card-url">vault.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Infrastructure -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-icon ic-green">
+        <svg class="ico" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      </div>
+      <span class="section-label">Infrastructure</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="grid">
+      <a class="card" href="http://longhorn.rezaops.com">
+        <div class="card-header">
+          <div class="card-icon ic-green">
+            <svg class="ico" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="card-name">Longhorn</div>
+        <div class="card-desc">Distributed storage</div>
+        <div class="card-url">longhorn.rezaops.com <svg class="ico-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+      </a>
+      <div class="card card-ghost">
+        <div class="card-header">
+          <div class="card-icon ic-gray">
+            <svg class="ico" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+          <span class="badge badge-soon">soon</span>
+        </div>
+        <div class="card-name">Your next app</div>
+        <div class="card-desc">Deploy &amp; add here</div>
+        <div class="card-url">myapp.rezaops.com</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Portfolio Projects -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-icon ic-purple"><i class="ti ti-code" aria-hidden="true"></i></div>
+    <span class="section-label">Portfolio Projects</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="grid">
+    <a class="card" href="http://django-user-api.rezaops.com/api/" target="_blank">
+      <div class="card-header">
+        <div class="card-icon ic-purple"><i class="ti ti-database" aria-hidden="true"></i></div>
+        <span class="card-badge badge-online">online</span>
+      </div>
+      <div class="card-name">Django REST API</div>
+      <div class="card-desc">Users, Items, Orders, PostgreSQL on Longhorn</div>
+      <div class="card-url">django-user-api.rezaops.com <i class="ti ti-external-link"></i></div>
+    </a>
+    <a class="card" href="http://fastapi-metrics.rezaops.com" target="_blank">
+      <div class="card-header">
+        <div class="card-icon ic-purple"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        <span class="card-badge badge-online">online</span>
+      </div>
+      <div class="card-name">FastAPI Microservice</div>
+      <div class="card-desc">Health checks, Prometheus metrics, HPA 1 to 5 pods</div>
+      <div class="card-url">fastapi.rezaops.com <i class="ti ti-external-link"></i></div>
+    </a>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

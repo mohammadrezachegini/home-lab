@@ -1,0 +1,7 @@
+---
+# ansible-playbook -i inventory/hosts.ini playbooks/10-registry.yml
+- name: Configure registry domain + Docker trust
+  hosts: all
+  become: yes
+  roles:
+    - registry_dns

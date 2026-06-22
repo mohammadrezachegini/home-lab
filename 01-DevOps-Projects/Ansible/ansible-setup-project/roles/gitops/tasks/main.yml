@@ -1,0 +1,134 @@
+---
+# ─────────────────────────────────────────
+# Role: gitops
+# Applies to: control plane (UM773)
+# Stack: ArgoCD, Vault, External Secrets Operator
+# ─────────────────────────────────────────
+
+- name: Add Helm repos for GitOps stack
+  shell: |
+    helm repo add argo https://argoproj.github.io/argo-helm
+    helm repo add hashicorp https://helm.releases.hashicorp.com
+    helm repo add external-secrets https://charts.external-secrets.io
+    helm repo update
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+# ── ArgoCD ────────────────────────────────
+- name: Create argocd namespace
+  shell: kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Install ArgoCD
+  shell: |
+    helm upgrade --install argocd argo/argo-cd \
+      --namespace argocd \
+      --set server.service.type=LoadBalancer \
+      --set server.nodeSelector."workload"=monitoring \
+      --set repoServer.nodeSelector."workload"=monitoring \
+      --set applicationSet.nodeSelector."workload"=monitoring \
+      --set notifications.nodeSelector."workload"=monitoring
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for ArgoCD server to be ready
+  shell: |
+    kubectl wait --namespace argocd \
+      --for=condition=ready pod \
+      --selector=app.kubernetes.io/name=argocd-server \
+      --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  retries: 3
+  delay: 20
+
+- name: Get ArgoCD initial admin password
+  shell: |
+    kubectl -n argocd get secret argocd-initial-admin-secret \
+      -o jsonpath="{.data.password}" | base64 -d
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: argocd_password
+
+- name: Print ArgoCD credentials
+  debug:
+    msg: "ArgoCD admin password: {{ argocd_password.stdout }}"
+
+# ── Vault ─────────────────────────────────
+- name: Create vault namespace
+  shell: kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Install Vault
+  shell: |
+    helm upgrade --install vault hashicorp/vault \
+      --namespace vault \
+      --set server.dev.enabled=true \
+      --set ui.enabled=true \
+      --set ui.serviceType=LoadBalancer \
+      --set server.nodeSelector."workload"=monitoring
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for Vault to be ready
+  shell: |
+    kubectl wait --namespace vault \
+      --for=condition=ready pod \
+      --selector=app.kubernetes.io/name=vault \
+      --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  retries: 3
+  delay: 15
+
+# ── External Secrets Operator ─────────────
+- name: Create external-secrets namespace
+  shell: kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Install External Secrets Operator
+  shell: |
+    helm upgrade --install external-secrets \
+      external-secrets/external-secrets \
+      --namespace external-secrets \
+      --set nodeSelector."workload"=monitoring
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Print all service endpoints
+  shell: kubectl get svc -A | grep LoadBalancer
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: all_svcs
+
+- name: Show all LoadBalancer IPs
+  debug:
+    msg: "{{ all_svcs.stdout_lines }}"
+
+- name: Print full stack access summary
+  debug:
+    msg:
+      - "════════════════════════════════════════════════════════"
+      - " FULL STACK READY — ACCESS FROM ANY DEVICE ON YOUR LAN"
+      - "════════════════════════════════════════════════════════"
+      - " Run this to get all IPs:"
+      - "   kubectl get svc -A | grep LoadBalancer"
+      - ""
+      - " SERVICE         PORT    CREDENTIALS"
+      - " ──────────────────────────────────────────────────────"
+      - " Grafana         80      admin / {{ grafana_admin_password }}"
+      - " Prometheus      9090    no auth"
+      - " Alertmanager    9093    no auth"
+      - " Jaeger UI       16686   no auth"
+      - " Jenkins         8080    admin / {{ jenkins_admin_password }}"
+      - " ArgoCD          80/443  admin / <printed above>"
+      - " Vault UI        8200    token: root (dev mode)"
+      - " Longhorn UI     80      no auth"
+      - " Registry        5000    no auth"
+      - " ──────────────────────────────────────────────────────"
+      - " All services are reachable from any device on 10.0.0.0/24"
+      - " (MacBook, phone, tablet — just open the IP in browser)"
+      - "════════════════════════════════════════════════════════"

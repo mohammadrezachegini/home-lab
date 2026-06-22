@@ -1,0 +1,49 @@
+---
+# ─────────────────────────────────────────
+# Role: longhorn
+# Applies to: control plane (runs kubectl)
+# ─────────────────────────────────────────
+
+- name: Add Longhorn Helm repo
+  shell: |
+    helm repo add longhorn https://charts.longhorn.io
+    helm repo update
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create longhorn-system namespace
+  shell: kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Install Longhorn
+  shell: |
+    helm upgrade --install longhorn longhorn/longhorn \
+      --namespace longhorn-system \
+      --set defaultSettings.defaultReplicaCount={{ longhorn_replica_count }} \
+      --set defaultSettings.storageMinimalAvailablePercentage=10 \
+      --set service.ui.type=LoadBalancer \
+      --version {{ longhorn_version }}
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for Longhorn to be ready
+  shell: |
+    kubectl wait --namespace longhorn-system \
+      --for=condition=ready pod \
+      --selector=app=longhorn-manager \
+      --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  retries: 3
+  delay: 20
+
+- name: Set Longhorn as default StorageClass
+  shell: |
+    kubectl patch storageclass local-path \
+      -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+    kubectl patch storageclass longhorn \
+      -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  ignore_errors: yes

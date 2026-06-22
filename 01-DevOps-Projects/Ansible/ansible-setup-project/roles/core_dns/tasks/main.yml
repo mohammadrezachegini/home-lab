@@ -1,0 +1,174 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Role: coredns_external
+# Applies to: control plane (jarvis)
+# What this does:
+#   1. Deploys CoreDNS as an external DNS resolver
+#   2. Adds all rezaops.com records pointing to ingress IP
+#   3. Forwards all other queries to 1.1.1.1 / 8.8.8.8
+# After running:
+#   Set DNS on your devices to the CoreDNS LoadBalancer IP
+# ─────────────────────────────────────────────────────────────
+
+- name: Create CoreDNS config
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: coredns-external
+      namespace: kube-system
+    data:
+      Corefile: |
+        {{ base_domain }} {
+            hosts {
+                {{ ingress_ip }} grafana.{{ base_domain }}
+                {{ ingress_ip }} prometheus.{{ base_domain }}
+                {{ ingress_ip }} alertmanager.{{ base_domain }}
+                {{ ingress_ip }} jaeger.{{ base_domain }}
+                {{ ingress_ip }} jenkins.{{ base_domain }}
+                {{ ingress_ip }} argocd.{{ base_domain }}
+                {{ ingress_ip }} vault.{{ base_domain }}
+                {{ ingress_ip }} longhorn.{{ base_domain }}
+                {{ ingress_ip }} registry.{{ base_domain }}
+                fallthrough
+            }
+        }
+        . {
+            forward . 1.1.1.1 8.8.8.8
+            cache 30
+        }
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Deploy CoreDNS external
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: coredns-external
+      namespace: kube-system
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: coredns-external
+      template:
+        metadata:
+          labels:
+            app: coredns-external
+        spec:
+          nodeSelector:
+            workload: monitoring
+          containers:
+          - name: coredns
+            image: coredns/coredns:1.11.1
+            args: ["-conf", "/etc/coredns/Corefile"]
+            ports:
+            - containerPort: 53
+              protocol: UDP
+            - containerPort: 53
+              protocol: TCP
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: 8080
+              initialDelaySeconds: 10
+            volumeMounts:
+            - name: config
+              mountPath: /etc/coredns
+          volumes:
+          - name: config
+            configMap:
+              name: coredns-external
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create CoreDNS TCP service
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: coredns-external-tcp
+      namespace: kube-system
+      annotations:
+        metallb.universe.tf/allow-shared-ip: "coredns-dns"
+    spec:
+      type: LoadBalancer
+      selector:
+        app: coredns-external
+      ports:
+      - port: 53
+        protocol: TCP
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create CoreDNS UDP service
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: coredns-external-udp
+      namespace: kube-system
+      annotations:
+        metallb.universe.tf/allow-shared-ip: "coredns-dns"
+    spec:
+      type: LoadBalancer
+      selector:
+        app: coredns-external
+      ports:
+      - port: 53
+        protocol: UDP
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for CoreDNS to be ready
+  shell: |
+    kubectl wait --namespace kube-system \
+      --for=condition=ready pod \
+      --selector=app=coredns-external \
+      --timeout=60s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  retries: 3
+  delay: 10
+
+- name: Get CoreDNS LoadBalancer IP
+  shell: |
+    kubectl get svc coredns-external-udp -n kube-system \
+      -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: coredns_ip
+  retries: 5
+  delay: 5
+
+- name: Print setup instructions
+  debug:
+    msg:
+      - "════════════════════════════════════════════════════════"
+      - " COREDNS DEPLOYED"
+      - "════════════════════════════════════════════════════════"
+      - " DNS server IP: {{ coredns_ip.stdout }}"
+      - ""
+      - " Set this DNS on every device:"
+      - " Primary DNS:   {{ coredns_ip.stdout }}"
+      - " Secondary DNS: 1.1.1.1"
+      - " Tertiary DNS:  8.8.8.8"
+      - ""
+      - " Mac:   System Settings → WiFi → Details → DNS"
+      - " iPhone: Settings → WiFi → network → Configure DNS → Manual"
+      - ""
+      - " Resolves:"
+      - " grafana.{{ base_domain }}      → {{ ingress_ip }}"
+      - " jenkins.{{ base_domain }}      → {{ ingress_ip }}"
+      - " argocd.{{ base_domain }}       → {{ ingress_ip }}"
+      - " (all other domains forwarded to 1.1.1.1)"
+      - "════════════════════════════════════════════════════════"

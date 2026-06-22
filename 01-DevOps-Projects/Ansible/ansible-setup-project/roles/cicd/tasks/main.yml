@@ -1,0 +1,133 @@
+---
+# ─────────────────────────────────────────
+# Role: cicd
+# Applies to: control plane (UM773)
+# Stack: Jenkins + local container registry
+# ─────────────────────────────────────────
+
+- name: Add Jenkins Helm repo
+  shell: |
+    helm repo add jenkins https://charts.jenkins.io
+    helm repo update
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create cicd namespace
+  shell: kubectl create namespace cicd --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+# ── Jenkins ───────────────────────────────
+- name: Install Jenkins
+  shell: |
+    helm upgrade --install jenkins jenkins/jenkins \
+      --namespace cicd \
+      --set controller.serviceType=LoadBalancer \
+      --set controller.admin.password={{ jenkins_admin_password }} \
+      --set controller.nodeSelector."workload"=monitoring \
+      --set agent.nodeSelector."workload"=apps \
+      --set persistence.storageClass=longhorn \
+      --set persistence.size=20Gi
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for Jenkins to be ready
+  shell: |
+    kubectl wait --namespace cicd \
+      --for=condition=ready pod \
+      --selector=app.kubernetes.io/name=jenkins \
+      --timeout=180s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  retries: 3
+  delay: 30
+
+# ── Container Registry ────────────────────
+- name: Create registry namespace
+  shell: kubectl create namespace registry --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Deploy local container registry
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: registry
+      namespace: registry
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: registry
+      template:
+        metadata:
+          labels:
+            app: registry
+        spec:
+          nodeSelector:
+            workload: monitoring
+          containers:
+          - name: registry
+            image: registry:2
+            ports:
+            - containerPort: 5000
+            env:
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+            volumeMounts:
+            - name: registry-data
+              mountPath: /var/lib/registry
+          volumes:
+          - name: registry-data
+            persistentVolumeClaim:
+              claimName: registry-pvc
+    ---
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: registry-pvc
+      namespace: registry
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: longhorn
+      resources:
+        requests:
+          storage: 50Gi
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: registry
+      namespace: registry
+    spec:
+      type: LoadBalancer
+      selector:
+        app: registry
+      ports:
+      - port: 5000
+        targetPort: 5000
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Configure K3s to allow insecure local registry
+  copy:
+    dest: /etc/rancher/k3s/registries.yaml
+    content: |
+      mirrors:
+        "{{ registry_ip }}:{{ registry_port }}":
+          endpoint:
+            - "http://{{ registry_ip }}:{{ registry_port }}"
+  notify: Restart K3s
+
+- name: Print CI/CD endpoints
+  shell: kubectl get svc -n cicd | grep LoadBalancer
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: cicd_svcs
+
+- name: Show CI/CD service IPs
+  debug:
+    msg: "{{ cicd_svcs.stdout_lines }}"

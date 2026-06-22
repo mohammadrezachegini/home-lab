@@ -1,0 +1,63 @@
+# ─────────────────────────────────────────
+# Global variables — apply to all hosts
+# ─────────────────────────────────────────
+
+# Timezone
+timezone: America/Vancouver
+
+# User
+lab_user: reza
+
+# Network
+lab_network: "10.0.0.0/24"
+router_ip: "10.0.0.1"
+
+# K3s
+k3s_version: "v1.29.4+k3s1"
+k3s_server_ip: "10.0.0.148"
+k3s_server_port: "6443"
+
+# MetalLB IP pool (outside your DHCP range)
+metallb_ip_range: "10.0.0.200-10.0.0.220"
+
+# Longhorn
+longhorn_replica_count: 2
+longhorn_version: "1.6.2"
+
+# Monitoring
+grafana_admin_password: "password"
+prometheus_retention: "15d"
+
+# Jenkins
+jenkins_admin_password: "password"
+
+# Registry
+registry_ip: "10.0.0.200"
+registry_port: "5000"
+
+# ── Domain + DNS ───────────────────────────
+base_domain: "rezaops.com"
+cp_ip: "10.0.0.148"      # UM773 — control plane services
+worker_ip: "10.0.0.149"  # M1 Plus — app services
+
+# Subdomains → which node they point to
+internal_dns_records:
+  - { name: "grafana",    ip: "{{ cp_ip }}" }
+  - { name: "prometheus", ip: "{{ cp_ip }}" }
+  - { name: "alertmanager", ip: "{{ cp_ip }}" }
+  - { name: "jaeger",     ip: "{{ cp_ip }}" }
+  - { name: "jenkins",    ip: "{{ cp_ip }}" }
+  - { name: "argocd",     ip: "{{ cp_ip }}" }
+  - { name: "vault",      ip: "{{ cp_ip }}" }
+  - { name: "longhorn",   ip: "{{ cp_ip }}" }
+  - { name: "registry",   ip: "{{ cp_ip }}" }
+  - { name: "portainer",  ip: "{{ worker_ip }}" }
+  - { name: "api",        ip: "{{ worker_ip }}" }
+
+# ── AWS / Route 53 ─────────────────────────
+# ⚠ Only two things to fill in before running playbooks/07-dns-tls.yml:
+aws_region: "us-east-1"
+aws_access_key_id: REPLACE_WITH_YOUR_KEY
+aws_secret_access_key: REPLACE_WITH_YOUR_KEY
+# Ansible creates the Route 53 private hosted zone automatically.
+# You do NOT need to create any records manually.

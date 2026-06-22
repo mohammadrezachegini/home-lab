@@ -1,0 +1,136 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Role: registry_dns
+# Applies to: all nodes + control plane
+# What this does:
+#   1. Creates NGINX ingress for registry.rezaops.com:5000
+#   2. Adds DNS record to CoreDNS
+#   3. Configures Docker daemon on all nodes to trust registry
+#   4. Configures K3s containerd to trust registry
+# After running:
+#   docker push registry.rezaops.com:5000/myapp:latest
+# ─────────────────────────────────────────────────────────────
+
+# ── 1. NGINX Ingress for registry (runs on control plane) ─────
+- name: Create Ingress for container registry
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: registry-ingress
+      namespace: registry
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "0"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: registry.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: registry
+                port:
+                  number: 5000
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  when: node_role == "control-plane"
+
+# ── 2. Add DNS record to CoreDNS ─────────────────────────────
+- name: Add registry DNS record to CoreDNS
+  shell: |
+    kubectl get configmap coredns-external -n kube-system -o yaml | \
+    sed 's|fallthrough|{{ ingress_ip }} registry.{{ base_domain }}\n            fallthrough|' | \
+    kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  when: node_role == "control-plane"
+  ignore_errors: yes
+
+- name: Restart CoreDNS to apply DNS record
+  shell: kubectl rollout restart deployment coredns-external -n kube-system
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  when: node_role == "control-plane"
+
+# ── 3. Configure Docker to trust insecure registry ────────────
+- name: Create Docker daemon config directory
+  file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+
+- name: Configure Docker daemon to trust local registry
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "insecure-registries": [
+          "registry.{{ base_domain }}:80",
+          "registry.{{ base_domain }}",
+          "{{ registry_ip }}:{{ registry_port }}"
+        ]
+      }
+
+- name: Restart Docker to apply registry config
+  systemd:
+    name: docker
+    state: restarted
+
+# ── 4. Configure K3s containerd to trust registry ─────────────
+- name: Create K3s registries config
+  copy:
+    dest: /etc/rancher/k3s/registries.yaml
+    content: |
+      mirrors:
+        "registry.{{ base_domain }}":
+          endpoint:
+            - "http://registry.{{ base_domain }}"
+        "registry.{{ base_domain }}:80":
+          endpoint:
+            - "http://registry.{{ base_domain }}"
+        "{{ registry_ip }}:{{ registry_port }}":
+          endpoint:
+            - "http://{{ registry_ip }}:{{ registry_port }}"
+
+- name: Restart K3s server to apply containerd registry config
+  systemd:
+    name: k3s
+    state: restarted
+  when: node_role == "control-plane"
+  ignore_errors: yes
+
+- name: Restart K3s agent to apply containerd registry config
+  systemd:
+    name: k3s-agent
+    state: restarted
+  when: node_role == "worker"
+  ignore_errors: yes
+
+# ── 5. Print usage instructions ───────────────────────────────
+- name: Print registry usage
+  debug:
+    msg:
+      - "════════════════════════════════════════════════════════"
+      - " REGISTRY SETUP COMPLETE"
+      - "════════════════════════════════════════════════════════"
+      - " Push an image:"
+      - "   docker tag myapp:latest registry.{{ base_domain }}/myapp:latest"
+      - "   docker push registry.{{ base_domain }}/myapp:latest"
+      - ""
+      - " Pull an image:"
+      - "   docker pull registry.{{ base_domain }}/myapp:latest"
+      - ""
+      - " Use in K8s deployment:"
+      - "   image: registry.{{ base_domain }}/myapp:latest"
+      - ""
+      - " List all images in registry:"
+      - "   curl http://registry.{{ base_domain }}/v2/_catalog"
+      - "════════════════════════════════════════════════════════"
+  when: node_role == "control-plane"

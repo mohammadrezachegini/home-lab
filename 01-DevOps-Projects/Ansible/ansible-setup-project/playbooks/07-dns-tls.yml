@@ -1,0 +1,7 @@
+---
+# ansible-playbook -i inventory/hosts.ini playbooks/07-dns-tls.yml
+- name: Route 53 private DNS + cert-manager TLS
+  hosts: control_plane
+  become: yes
+  roles:
+    - dns_tls

@@ -1,0 +1,7 @@
+---
+# ansible-playbook -i inventory/hosts.ini playbooks/06-gitops.yml
+- name: GitOps stack
+  hosts: control_plane
+  become: yes
+  roles:
+    - gitops

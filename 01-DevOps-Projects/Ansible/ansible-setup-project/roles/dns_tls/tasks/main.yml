@@ -1,0 +1,305 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Role: dns_tls
+# Applies to: control plane (jarvis)
+# ─────────────────────────────────────────────────────────────
+
+# ── 1. AWS CLI + boto3 ────────────────────────────────────────
+- name: Install pip and unzip
+  apt:
+    name: [python3-pip, unzip]
+    state: present
+
+- name: Install boto3
+  pip:
+    name: [boto3, botocore]
+    state: present
+    extra_args: "--break-system-packages"
+
+- name: Install AWS CLI v2
+  shell: |
+    curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp/
+    sudo /tmp/aws/install --update
+  args:
+    creates: /usr/local/bin/aws
+
+- name: Create AWS credentials directory
+  file:
+    path: /root/.aws
+    state: directory
+    mode: '0700'
+
+- name: Write AWS credentials
+  copy:
+    dest: /root/.aws/credentials
+    mode: '0600'
+    content: |
+      [default]
+      aws_access_key_id = {{ aws_access_key_id }}
+      aws_secret_access_key = {{ aws_secret_access_key }}
+
+- name: Write AWS config
+  copy:
+    dest: /root/.aws/config
+    content: |
+      [default]
+      region = {{ aws_region }}
+
+# ── 2. Route 53 hosted zone ───────────────────────────────────
+- name: Check if hosted zone already exists
+  shell: |
+    aws route53 list-hosted-zones-by-name \
+      --dns-name {{ base_domain }}. \
+      --query "HostedZones[?Name=='{{ base_domain }}.'].Id" \
+      --output text
+  register: existing_zone
+  changed_when: false
+
+- name: Create hosted zone if it does not exist
+  shell: |
+    aws route53 create-hosted-zone \
+      --name {{ base_domain }} \
+      --caller-reference "homelab-$(date +%s)" \
+      --hosted-zone-config Comment="Homelab DNS" \
+      --query "HostedZone.Id" \
+      --output text
+  register: created_zone
+  when: existing_zone.stdout | trim == ""
+
+- name: Set hosted zone ID fact
+  set_fact:
+    r53_zone_id: >-
+      {{
+        (existing_zone.stdout | trim != '')
+        | ternary(
+            existing_zone.stdout | regex_replace('/hostedzone/', '') | trim,
+            created_zone.stdout  | regex_replace('/hostedzone/', '') | trim
+          )
+      }}
+
+- name: Show zone ID
+  debug:
+    msg: "Using Route 53 zone: {{ r53_zone_id }}"
+
+# ── 3. Create all A records in one batch ─────────────────────
+- name: Upsert all DNS A records
+  shell: |
+    aws route53 change-resource-record-sets \
+      --hosted-zone-id {{ r53_zone_id }} \
+      --change-batch '{"Changes":[
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"grafana.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"prometheus.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"alertmanager.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"jaeger.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"jenkins.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"argocd.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"vault.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"longhorn.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"registry.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ cp_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"portainer.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ worker_ip }}"}]}},
+        {"Action":"UPSERT","ResourceRecordSet":{"Name":"api.{{ base_domain }}","Type":"A","TTL":60,"ResourceRecords":[{"Value":"{{ worker_ip }}"}]}}
+      ]}'
+  changed_when: true
+
+- name: Show created records
+  debug:
+    msg:
+      - "grafana.{{ base_domain }}      → {{ cp_ip }}"
+      - "prometheus.{{ base_domain }}   → {{ cp_ip }}"
+      - "alertmanager.{{ base_domain }} → {{ cp_ip }}"
+      - "jaeger.{{ base_domain }}       → {{ cp_ip }}"
+      - "jenkins.{{ base_domain }}      → {{ cp_ip }}"
+      - "argocd.{{ base_domain }}       → {{ cp_ip }}"
+      - "vault.{{ base_domain }}        → {{ cp_ip }}"
+      - "longhorn.{{ base_domain }}     → {{ cp_ip }}"
+      - "registry.{{ base_domain }}     → {{ cp_ip }}"
+      - "portainer.{{ base_domain }}    → {{ worker_ip }}"
+      - "api.{{ base_domain }}          → {{ worker_ip }}"
+
+# ── 4. NGINX Ingress resources ────────────────────────────────
+- name: Create Ingress for monitoring stack
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: monitoring-ingress
+      namespace: monitoring
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: grafana.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
+      - host: prometheus.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-prometheus
+                port:
+                  number: 9090
+      - host: alertmanager.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-alertmanager
+                port:
+                  number: 9093
+      - host: jaeger.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger-query
+                port:
+                  number: 16686
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create Ingress for Jenkins
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: jenkins-ingress
+      namespace: cicd
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: jenkins.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jenkins
+                port:
+                  number: 8080
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create Ingress for ArgoCD
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: argocd-ingress
+      namespace: argocd
+      annotations:
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: argocd.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Patch ArgoCD to disable internal TLS
+  shell: |
+    kubectl patch configmap argocd-cmd-params-cm \
+      -n argocd \
+      --type merge \
+      -p '{"data":{"server.insecure":"true"}}'
+    kubectl rollout restart deployment argocd-server -n argocd
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create Ingress for Vault
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: vault-ingress
+      namespace: vault
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: vault.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vault-ui
+                port:
+                  number: 8200
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create Ingress for Longhorn
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: longhorn-ingress
+      namespace: longhorn-system
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: longhorn.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: longhorn-frontend
+                port:
+                  number: 80
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+# ── 5. Final summary ──────────────────────────────────────────
+- name: Print access URLs
+  debug:
+    msg:
+      - "════════════════════════════════════════════════════════"
+      - " SETUP COMPLETE — open from any device on your WiFi"
+      - "════════════════════════════════════════════════════════"
+      - " http://grafana.{{ base_domain }}"
+      - " http://prometheus.{{ base_domain }}"
+      - " http://alertmanager.{{ base_domain }}"
+      - " http://jaeger.{{ base_domain }}"
+      - " http://jenkins.{{ base_domain }}"
+      - " http://argocd.{{ base_domain }}"
+      - " http://vault.{{ base_domain }}"
+      - " http://longhorn.{{ base_domain }}"
+      - "════════════════════════════════════════════════════════"

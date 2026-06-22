@@ -1,0 +1,7 @@
+---
+# ansible-playbook -i inventory/hosts.ini playbooks/03-longhorn.yml
+- name: Longhorn storage
+  hosts: control_plane
+  become: yes
+  roles:
+    - longhorn

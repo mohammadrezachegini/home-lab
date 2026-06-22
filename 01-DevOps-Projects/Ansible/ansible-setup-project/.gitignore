@@ -1,0 +1,27 @@
+cat > .gitignore << 'EOF'
+# Ansible vault files
+*.vault
+vault_pass.txt
+
+# Environment secrets
+.env
+*.pem
+*.key
+
+# AWS credentials
+credentials
+.aws/
+
+# Sensitive inventory values - if you have a separate secrets file
+secrets.yml
+group_vars/secrets.yml
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+EOF

@@ -1,0 +1,7 @@
+---
+# ansible-playbook -i inventory/hosts.ini playbooks/08-coredns.yml
+- name: Deploy CoreDNS external DNS resolver
+  hosts: control_plane
+  become: yes
+  roles:
+    - core_dns

@@ -1,0 +1,131 @@
+---
+# ─────────────────────────────────────────
+# Role: k3s_server
+# Applies to: control plane (UM773)
+# ─────────────────────────────────────────
+
+- name: Check if K3s server is already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Install K3s server
+  shell: |
+    curl -sfL https://get.k3s.io | sh -s - server \
+      --disable traefik \
+      --disable servicelb \
+      --node-name {{ node_name }} \
+      --advertise-address {{ node_ip }} \
+      --bind-address {{ node_ip }} \
+      --write-kubeconfig-mode 644
+  when: not k3s_binary.stat.exists
+
+- name: Wait for K3s to be ready
+  wait_for:
+    path: /var/lib/rancher/k3s/server/node-token
+    timeout: 60
+
+- name: Ensure K3s service is enabled and running
+  systemd:
+    name: k3s
+    enabled: yes
+    state: started
+
+- name: Read K3s node token
+  slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_token_raw
+
+- name: Set K3s token fact (shared with worker)
+  set_fact:
+    k3s_token: "{{ k3s_token_raw.content | b64decode | trim }}"
+
+- name: Save token to dummy host for worker to use
+  add_host:
+    name: "k3s_token_holder"
+    k3s_token: "{{ k3s_token }}"
+
+- name: Wait for K3s API to be available
+  wait_for:
+    host: "{{ node_ip }}"
+    port: 6443
+    timeout: 60
+
+- name: Label control plane node
+  shell: |
+    kubectl label node {{ node_name }} \
+      node-role=control-plane \
+      workload={{ workload_label }} \
+      --overwrite
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Install Helm
+  shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    creates: /usr/local/bin/helm
+
+- name: Install MetalLB
+  shell: |
+    kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for MetalLB to be ready
+  shell: |
+    kubectl wait --namespace metallb-system \
+      --for=condition=ready pod \
+      --selector=app=metallb \
+      --timeout=90s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  retries: 3
+  delay: 15
+
+- name: Configure MetalLB IP pool
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: metallb.io/v1beta1
+    kind: IPAddressPool
+    metadata:
+      name: homelab-pool
+      namespace: metallb-system
+    spec:
+      addresses:
+      - {{ metallb_ip_range }}
+    ---
+    apiVersion: metallb.io/v1beta1
+    kind: L2Advertisement
+    metadata:
+      name: homelab-l2
+      namespace: metallb-system
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Install NGINX Ingress Controller
+  shell: |
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/cloud/deploy.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Create .kube dir for user
+  file:
+    path: /home/{{ lab_user }}/.kube
+    state: directory
+    owner: "{{ lab_user }}"
+    mode: '0755'
+
+- name: Copy kubeconfig to user home
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /home/{{ lab_user }}/.kube/config
+    remote_src: yes
+    owner: "{{ lab_user }}"
+    mode: '0600'
+
+- name: Fix kubeconfig server address
+  replace:
+    path: /home/{{ lab_user }}/.kube/config
+    regexp: 'https://127\.0\.0\.1:6443'
+    replace: 'https://{{ node_ip }}:6443'

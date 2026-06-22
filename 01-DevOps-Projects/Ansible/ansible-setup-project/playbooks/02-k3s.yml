@@ -1,0 +1,15 @@
+---
+# Run only K3s cluster setup
+# ansible-playbook -i inventory/hosts.ini playbooks/02-k3s.yml
+
+- name: K3s control plane
+  hosts: control_plane
+  become: yes
+  roles:
+    - k3s_server
+
+- name: K3s worker
+  hosts: workers
+  become: yes
+  roles:
+    - k3s_agent

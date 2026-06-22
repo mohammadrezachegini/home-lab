@@ -1,0 +1,45 @@
+---
+# ─────────────────────────────────────────
+# Role: k3s_agent
+# Applies to: worker node (M1 Plus)
+# ─────────────────────────────────────────
+
+- name: Check if K3s agent is already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Install K3s agent
+  shell: |
+    curl -sfL https://get.k3s.io | sh -s - agent \
+      --server https://{{ k3s_server_ip }}:{{ k3s_server_port }} \
+      --token {{ hostvars['k3s_token_holder']['k3s_token'] }} \
+      --node-name {{ node_name }}
+  when: not k3s_binary.stat.exists
+
+- name: Ensure K3s agent service is enabled and running
+  systemd:
+    name: k3s-agent
+    enabled: yes
+    state: started
+
+- name: Wait for worker node to join cluster
+  shell: |
+    kubectl get node {{ node_name }} --no-headers
+  delegate_to: jarvis
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: node_status
+  until: "'Ready' in node_status.stdout"
+  retries: 15
+  delay: 10
+
+- name: Label worker node
+  shell: |
+    kubectl label node {{ node_name }} \
+      node-role=worker \
+      workload={{ workload_label }} \
+      --overwrite
+  delegate_to: jarvis
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml

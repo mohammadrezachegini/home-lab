@@ -1,0 +1,107 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Role: homepage
+# Applies to: control plane (jarvis)
+# Deploys a static homepage served by nginx at home.rezaops.com
+# ─────────────────────────────────────────────────────────────
+
+- name: Create homepage namespace
+  shell: kubectl create namespace homepage --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+
+- name: Copy homepage HTML to remote
+  copy:
+    src: index.html
+    dest: /tmp/homepage-index.html
+
+
+- name: Deploy homepage
+  shell: |
+    cat <<EOF | kubectl apply -f -
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: homepage
+      namespace: homepage
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: homepage
+      template:
+        metadata:
+          labels:
+            app: homepage
+        spec:
+          nodeSelector:
+            workload: monitoring
+          containers:
+          - name: homepage
+            image: nginx:alpine
+            ports:
+            - containerPort: 80
+            volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+          volumes:
+          - name: html
+            configMap:
+              name: homepage-html
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: homepage
+      namespace: homepage
+    spec:
+      selector:
+        app: homepage
+      ports:
+      - port: 80
+        targetPort: 80
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: homepage-ingress
+      namespace: homepage
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: home.{{ base_domain }}
+        http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: homepage
+                port:
+                  number: 80
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Add home DNS record to CoreDNS
+  shell: |
+    kubectl get configmap coredns-external -n kube-system -o yaml | \
+    sed 's|fallthrough|{{ ingress_ip }} home.{{ base_domain }}\n            fallthrough|' | \
+    kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  ignore_errors: yes
+
+- name: Restart CoreDNS to pick up new record
+  shell: kubectl rollout restart deployment coredns-external -n kube-system
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Print homepage URL
+  debug:
+    msg:
+      - "════════════════════════════════════════"
+      - " Homepage deployed!"
+      - " http://home.{{ base_domain }}"
+      - "════════════════════════════════════════"

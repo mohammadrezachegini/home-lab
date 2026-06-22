@@ -1,0 +1,70 @@
+---
+# ═══════════════════════════════════════════════════════════
+#  Homelab Full Stack Playbook
+#  Run from MacBook: ansible-playbook -i inventory/hosts.ini site.yml
+# ═══════════════════════════════════════════════════════════
+
+# ── Phase 1: Base OS setup on ALL nodes ──────────────────
+- name: Common setup on all nodes
+  hosts: all
+  become: yes
+  gather_facts: yes
+  roles:
+    - common
+    - networking
+
+# ── Phase 2: K3s control plane on UM773 ──────────────────
+- name: Set up K3s server (control plane)
+  hosts: control_plane
+  become: yes
+  gather_facts: yes
+  roles:
+    - k3s_server
+
+# ── Phase 3: K3s agent on M1 Plus ────────────────────────
+- name: Set up K3s agent (worker)
+  hosts: workers
+  become: yes
+  gather_facts: yes
+  roles:
+    - k3s_agent
+
+# ── Phase 4: Longhorn storage (runs from CP) ──────────────
+- name: Install Longhorn distributed storage
+  hosts: control_plane
+  become: yes
+  gather_facts: no
+  roles:
+    - longhorn
+
+# ── Phase 5: Monitoring stack on UM773 ───────────────────
+- name: Install monitoring stack
+  hosts: control_plane
+  become: yes
+  gather_facts: no
+  roles:
+    - monitoring
+
+# ── Phase 6: CI/CD stack on UM773 ────────────────────────
+- name: Install CI/CD stack
+  hosts: control_plane
+  become: yes
+  gather_facts: no
+  roles:
+    - cicd
+
+# ── Phase 7: GitOps stack on UM773 ───────────────────────
+- name: Install GitOps stack
+  hosts: control_plane
+  become: yes
+  gather_facts: no
+  roles:
+    - gitops
+
+# ── Phase 8: DNS + TLS (Route 53 + cert-manager) ─────────
+- name: Configure internal DNS and TLS certificates
+  hosts: control_plane
+  become: yes
+  gather_facts: no
+  roles:
+    - dns_tls
